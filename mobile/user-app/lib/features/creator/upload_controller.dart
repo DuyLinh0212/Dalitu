@@ -224,7 +224,10 @@ class UploadTray extends StatelessWidget {
       final title = AppStrings.t(switch (c.phase) {
         UploadPhase.uploading => 'uploadTray.uploading',
         UploadPhase.processing => 'uploadTray.processing',
-        UploadPhase.completed => 'parity.uploadDone',
+        UploadPhase.completed =>
+          c.video?.processingStatus == 'published'
+              ? 'uploadTray.published'
+              : _savedHint(c.video) ?? 'parity.uploadDone',
         UploadPhase.partial => 'parity.playlistPartial',
         UploadPhase.cancelled => 'parity.cancelled',
         _ => 'parity.uploadFailed',
@@ -241,7 +244,7 @@ class UploadTray extends StatelessWidget {
       return SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+          padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
           child: Align(
             heightFactor: 1,
             alignment: Alignment.bottomCenter,
@@ -253,22 +256,22 @@ class UploadTray extends StatelessWidget {
                 shadowColor: colors.shadow.withValues(alpha: .08),
                 color: colors.surfaceContainerLow,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
                     color: colors.outlineVariant.withValues(alpha: .6),
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(top: 4),
+                        padding: EdgeInsets.zero,
                         child: SizedBox(
-                          width: 38,
-                          height: 38,
+                          width: 32,
+                          height: 32,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
@@ -302,7 +305,7 @@ class UploadTray extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -319,7 +322,7 @@ class UploadTray extends StatelessWidget {
                                     ),
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               c.fileName,
                               maxLines: 1,
@@ -345,14 +348,6 @@ class UploadTray extends StatelessWidget {
                                 c.total > 0
                                     ? '${((c.progress ?? 0) * 100).round()}% · ${_bytes(c.sent)} / ${_bytes(c.total)}'
                                     : AppStrings.t('uploadTray.connecting'),
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: colors.onSurfaceVariant),
-                              ),
-                            ],
-                            if (c.phase == UploadPhase.processing) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                AppStrings.t('uploadTray.processingHint'),
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: colors.onSurfaceVariant),
                               ),
@@ -412,6 +407,18 @@ class UploadTray extends StatelessWidget {
       );
     },
   );
+
+  static String? _savedHint(VideoDetail? video) {
+    if (video?.processingStatus == 'failed') return 'uploadTray.savedFailed';
+    if (video?.moderationStatus == 'pending' ||
+        video?.moderationStatus == 'reviewing') {
+      return 'uploadTray.savedPending';
+    }
+    if (video?.processingStatus == 'processing') {
+      return 'uploadTray.savedProcessing';
+    }
+    return null;
+  }
 
   static String _bytes(int bytes) {
     if (bytes < 1024) return '$bytes B';

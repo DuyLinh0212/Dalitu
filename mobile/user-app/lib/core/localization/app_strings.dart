@@ -594,7 +594,11 @@ class AppStrings {
       'uploadTray.uploading': 'Đang tải video lên',
       'uploadTray.processing': 'Đang xử lý video',
       'uploadTray.processingHint':
-          'Đã truyền xong file. Bạn có thể tiếp tục dùng app.',
+          'Đã truyền xong file. Đang chờ máy chủ xác nhận lưu video.',
+      'uploadTray.savedProcessing': 'Đã lưu · Đang xử lý',
+      'uploadTray.savedPending': 'Đã lưu · Chờ duyệt',
+      'uploadTray.savedFailed': 'Đã lưu · Cần xử lý lại trong Studio',
+      'uploadTray.published': 'Video đã được xuất bản',
       'uploadTray.connecting': 'Đang kết nối…',
       'downloads.videoFallback': 'Video',
       'downloads.empty': 'Chưa có video tải xuống.',
@@ -777,8 +781,7 @@ class AppStrings {
       'auth.verifyMissing':
           'Liên kết thiếu mã xác minh. Hãy yêu cầu một email mới.',
       'auth.resetTitle': 'Đặt mật khẩu mới',
-      'auth.resetDescription':
-          'Nhập mã OTP trong email và chọn mật khẩu mới.',
+      'auth.resetDescription': 'Nhập mã OTP trong email và chọn mật khẩu mới.',
       'auth.resetCodeField': 'Mã OTP',
       'auth.resetCodeHint': 'Mã gồm 8 chữ số, có hiệu lực trong 10 phút.',
       'auth.resetCodeInvalid': 'Nhập mã OTP gồm đúng 8 chữ số.',
@@ -2203,7 +2206,12 @@ class AppStrings {
 
       'uploadTray.uploading': 'Uploading video',
       'uploadTray.processing': 'Processing video',
-      'uploadTray.processingHint': 'File sent. You can keep using the app.',
+      'uploadTray.processingHint':
+          'File sent. Waiting for the server to confirm the video is saved.',
+      'uploadTray.savedProcessing': 'Saved · Processing',
+      'uploadTray.savedPending': 'Saved · Awaiting review',
+      'uploadTray.savedFailed': 'Saved · Retry processing in Studio',
+      'uploadTray.published': 'Video published',
       'uploadTray.connecting': 'Connecting…',
       'downloads.videoFallback': 'Video',
       'downloads.empty': 'No downloaded videos yet.',
