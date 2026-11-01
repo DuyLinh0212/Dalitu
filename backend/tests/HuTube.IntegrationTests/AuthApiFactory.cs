@@ -130,6 +130,7 @@ public class AuthApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimit:PaymentWebhookPermitLimit", "10000");
         builder.UseSetting("RateLimit:AdminPermitLimit", "10000");
         builder.UseSetting("RateLimit:ModerationPermitLimit", "10000");
+        builder.UseSetting("RateLimit:CommentPermitLimit", "10000");
         builder.UseSetting("RateLimit:CfSeederPermitLimit", "10000");
         builder.UseSetting("RateLimit:CfSeederUploadPermitLimit", "10000");
         builder.UseSetting("RateLimit:RecommendationJobPermitLimit", "10000");

@@ -35,7 +35,7 @@ export const networkInterceptor: HttpInterceptorFn = (request, next) => {
     }),
     catchError((error: unknown) => {
       if (config.ownsRecommendation(request.url)) return throwError(() => error);
-      if (error instanceof TimeoutError || (error instanceof HttpErrorResponse && (error.status === 0 || error.status === 429 || error.status >= 500))) {
+      if (error instanceof TimeoutError || (error instanceof HttpErrorResponse && (error.status === 0 || error.status >= 500))) {
         networkStatus.markUnavailable();
       } else if (error instanceof HttpErrorResponse && error.status > 0) {
         networkStatus.markAvailable();

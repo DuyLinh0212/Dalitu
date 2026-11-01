@@ -27,4 +27,30 @@ describe('Recommendation response deadline', () => {
     expect(error instanceof TimeoutError).toBeTrue();
     http.verify();
   }));
+
+  it('treats API rate limiting as reachable instead of showing the network fallback', () => {
+    const networkStatus = {
+      markAvailable: jasmine.createSpy('markAvailable'),
+      markUnavailable: jasmine.createSpy('markUnavailable'),
+      checkConnection: () => Promise.resolve(true),
+    };
+    TestBed.configureTestingModule({ providers: [
+      provideHttpClient(withInterceptors([networkInterceptor])), provideHttpClientTesting(),
+      { provide: NetworkStatusService, useValue: networkStatus },
+    ] });
+    const config = TestBed.inject(RuntimeConfig);
+    config.apiBaseUrl = 'https://api.test/api/v1';
+    const http = TestBed.inject(HttpTestingController);
+    let error: unknown;
+
+    TestBed.inject(HttpClient).post(`${config.apiBaseUrl}/videos/video-id/comments`, { content: 'spam' })
+      .subscribe({ error: value => { error = value; } });
+    http.expectOne(`${config.apiBaseUrl}/videos/video-id/comments`)
+      .flush({ code: 'COMMENT_RATE_LIMIT_EXCEEDED' }, { status: 429, statusText: 'Too Many Requests' });
+
+    expect((error as { status: number }).status).toBe(429);
+    expect(networkStatus.markUnavailable).not.toHaveBeenCalled();
+    expect(networkStatus.markAvailable).toHaveBeenCalled();
+    http.verify();
+  });
 });

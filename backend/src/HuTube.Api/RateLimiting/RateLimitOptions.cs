@@ -4,6 +4,8 @@ namespace HuTube.Api.RateLimiting;
 
 public sealed class RateLimitOptions
 {
+    public const string CommentCreationPolicy = "comment-create";
+
     public int WindowSeconds { get; init; } = 60;
     public int AuthPermitLimit { get; init; } = 60;
     public int FeedPermitLimit { get; init; } = 90;
@@ -17,6 +19,8 @@ public sealed class RateLimitOptions
     public int PaymentWebhookPermitLimit { get; init; } = 120;
     public int AdminPermitLimit { get; init; } = 120;
     public int ModerationPermitLimit { get; init; } = 60;
+    public int CommentPermitLimit { get; init; } = 2;
+    public int CommentWindowSeconds { get; init; } = 2;
     public int CfSeederPermitLimit { get; init; } = 30;
     public int CfSeederUploadPermitLimit { get; init; } = 6;
     public int RecommendationJobPermitLimit { get; init; } = 4;
@@ -24,11 +28,14 @@ public sealed class RateLimitOptions
     public int RecommendationJobQueueLimit { get; init; }
 
     public TimeSpan Window => TimeSpan.FromSeconds(WindowSeconds);
+    public TimeSpan CommentWindow => TimeSpan.FromSeconds(CommentWindowSeconds);
 
     public void Validate()
     {
         if (WindowSeconds is < 1 or > 3600)
             throw new InvalidOperationException("RateLimit:WindowSeconds must be between 1 and 3600.");
+        if (CommentWindowSeconds is < 1 or > 3600)
+            throw new InvalidOperationException("RateLimit:CommentWindowSeconds must be between 1 and 3600.");
 
         ValidatePositive(nameof(AuthPermitLimit), AuthPermitLimit);
         ValidatePositive(nameof(FeedPermitLimit), FeedPermitLimit);
@@ -42,6 +49,7 @@ public sealed class RateLimitOptions
         ValidatePositive(nameof(PaymentWebhookPermitLimit), PaymentWebhookPermitLimit);
         ValidatePositive(nameof(AdminPermitLimit), AdminPermitLimit);
         ValidatePositive(nameof(ModerationPermitLimit), ModerationPermitLimit);
+        ValidatePositive(nameof(CommentPermitLimit), CommentPermitLimit);
         ValidatePositive(nameof(CfSeederPermitLimit), CfSeederPermitLimit);
         ValidatePositive(nameof(CfSeederUploadPermitLimit), CfSeederUploadPermitLimit);
         ValidatePositive(nameof(RecommendationJobPermitLimit), RecommendationJobPermitLimit);
@@ -65,6 +73,16 @@ internal static class RateLimitPolicies
         {
             PermitLimit = permitLimit,
             Window = window,
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+
+    public static RateLimitPartition<string> SlidingWindow(HttpContext context, int permitLimit, TimeSpan window) =>
+        RateLimitPartition.GetSlidingWindowLimiter(ClientKey(context), _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = window,
+            SegmentsPerWindow = 10,
             QueueLimit = 0,
             AutoReplenishment = true
         });

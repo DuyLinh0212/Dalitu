@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.RateLimiting;
 using HuTube.Api.Middleware;
 using HuTube.Api.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using HuTube.Api.Services;
 using HuTube.Application.Account;
 using HuTube.Application.Auth;
@@ -304,6 +305,8 @@ builder.Services.AddRateLimiter(options => {
     options.AddPolicy("feedback-survey-webhook", context => RateLimitPolicies.FixedWindow(context, 120, rateLimitOptions.Window));
     options.AddPolicy("admin", context => RateLimitPolicies.FixedWindow(context, rateLimitOptions.AdminPermitLimit, rateLimitOptions.Window));
     options.AddPolicy("moderation", context => RateLimitPolicies.FixedWindow(context, rateLimitOptions.ModerationPermitLimit, rateLimitOptions.Window));
+    options.AddPolicy(RateLimitOptions.CommentCreationPolicy, context => RateLimitPolicies.SlidingWindow(
+        context, rateLimitOptions.CommentPermitLimit, rateLimitOptions.CommentWindow));
     options.AddPolicy("cf-seeder", context => RateLimitPolicies.FixedWindow(context, rateLimitOptions.CfSeederPermitLimit, rateLimitOptions.Window));
     options.AddPolicy("cf-seeder-upload", context => RateLimitPolicies.FixedWindow(context, rateLimitOptions.CfSeederUploadPermitLimit, rateLimitOptions.Window));
     options.AddPolicy("recommendation-job", _ => RateLimitPolicies.GlobalRecommendationJobs(
@@ -312,8 +315,15 @@ builder.Services.AddRateLimiter(options => {
         rateLimitOptions.RecommendationJobConcurrencyLimit,
         rateLimitOptions.RecommendationJobQueueLimit));
     options.OnRejected = async (context, _) => {
-        context.HttpContext.Response.Headers.RetryAfter = rateLimitOptions.WindowSeconds.ToString();
-        await ApiErrors.WriteAsync(context.HttpContext, 429, "RATE_LIMIT_EXCEEDED", "Yêu cầu quá nhanh. Vui lòng thử lại sau một phút.");
+        var isCommentLimit = context.HttpContext.GetEndpoint()?.Metadata
+            .GetMetadata<EnableRateLimitingAttribute>()?.PolicyName == RateLimitOptions.CommentCreationPolicy;
+        var retryAfterSeconds = isCommentLimit ? rateLimitOptions.CommentWindowSeconds : rateLimitOptions.WindowSeconds;
+        context.HttpContext.Response.Headers.RetryAfter = retryAfterSeconds.ToString();
+        await ApiErrors.WriteAsync(context.HttpContext, 429,
+            isCommentLimit ? "COMMENT_RATE_LIMIT_EXCEEDED" : "RATE_LIMIT_EXCEEDED",
+            isCommentLimit
+                ? $"Bạn đang bình luận quá nhanh. Vui lòng đợi {retryAfterSeconds} giây rồi thử lại."
+                : "Yêu cầu quá nhanh. Vui lòng thử lại sau một phút.");
     };
 });
 

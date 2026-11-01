@@ -217,7 +217,7 @@ export class AuthService {
       timeout({ first: 15_000 }),
       tap(() => this.networkStatus.markAvailable()),
       catchError((error: unknown) => {
-        if (error instanceof TimeoutError || (error instanceof HttpErrorResponse && (error.status === 0 || error.status === 429 || error.status >= 500))) {
+        if (error instanceof TimeoutError || (error instanceof HttpErrorResponse && (error.status === 0 || error.status >= 500))) {
           this.networkStatus.markUnavailable();
         } else if (error instanceof HttpErrorResponse && error.status > 0) {
           this.networkStatus.markAvailable();

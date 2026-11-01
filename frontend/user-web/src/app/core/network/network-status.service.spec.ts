@@ -6,14 +6,14 @@ describe('Network health probe backoff', () => {
   let service: NetworkStatusService;
   let fetchSpy: jasmine.Spy;
   beforeEach(() => {
-    fetchSpy = spyOn(window, 'fetch').and.returnValue(Promise.resolve({ ok: false, status: 429 } as Response));
+    fetchSpy = spyOn(window, 'fetch').and.returnValue(Promise.resolve({ ok: false, status: 503 } as Response));
     TestBed.configureTestingModule({ providers: [
       { provide: RuntimeConfig, useValue: { apiBaseUrl: 'https://api.test/api/v1' } },
     ] });
   });
   afterEach(() => service.ngOnDestroy());
 
-  it('does not amplify failed requests with immediate probes and treats 429 as unavailable', fakeAsync(() => {
+  it('does not amplify failed requests with immediate probes', fakeAsync(() => {
     service = TestBed.inject(NetworkStatusService);
     service.markAvailable();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -27,6 +27,19 @@ describe('Network health probe backoff', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     tick(59_999); flushMicrotasks();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+    service.ngOnDestroy();
+  }));
+
+  it('treats HTTP 429 as a reachable API response', fakeAsync(() => {
+    service = TestBed.inject(NetworkStatusService);
+    service.markAvailable();
+    service.markUnavailable();
+    fetchSpy.and.returnValue(Promise.resolve({ ok: false, status: 429 } as Response));
+
+    tick(30_000); flushMicrotasks();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(service.unavailable()).toBeFalse();
     service.ngOnDestroy();
   }));
 

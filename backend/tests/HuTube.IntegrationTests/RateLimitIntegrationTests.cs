@@ -48,6 +48,30 @@ public sealed class RateLimitIntegrationTests(AuthApiFactory factory) : IClassFi
         await AssertRateLimitResponseAsync(response);
     }
 
+    [Fact]
+    public async Task CommentCreation_RateLimitExceeded_ShouldReturnTwoSecondRetryContract()
+    {
+        await using var limited = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("RateLimit:CommentPermitLimit", "2");
+            builder.UseSetting("RateLimit:CommentWindowSeconds", "2");
+        });
+        using var client = limited.CreateClient(new() { HandleCookies = false });
+        var url = $"/api/v1/videos/{Guid.NewGuid()}/comments";
+
+        var first = await client.PostAsJsonAsync(url, new { content = "first", parentCommentId = (Guid?)null });
+        var second = await client.PostAsJsonAsync(url, new { content = "second", parentCommentId = (Guid?)null });
+        Assert.Equal(HttpStatusCode.Unauthorized, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
+
+        var response = await client.PostAsJsonAsync(url, new { content = "third", parentCommentId = (Guid?)null });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        Assert.Equal(TimeSpan.FromSeconds(2), response.Headers.RetryAfter?.Delta);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("COMMENT_RATE_LIMIT_EXCEEDED", body.GetProperty("code").GetString());
+    }
+
     private static async Task AssertRateLimitResponseAsync(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using HuTube.Api.RateLimiting;
 using HuTube.Application.Videos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -290,7 +291,7 @@ public sealed class CommentsController(IContentService content, HuTube.Infrastru
     [HttpGet("videos/{videoId:guid}/comments")]
     public Task<PageResult<CommentResponse>> GetAsync(Guid videoId, [FromQuery] string sort = "newest", [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) => content.GetCommentsAsync(videoId, CurrentUserId, sort, page, pageSize, ct);
 
-    [Authorize, HttpPost("videos/{videoId:guid}/comments")]
+    [Authorize, HttpPost("videos/{videoId:guid}/comments"), EnableRateLimiting(RateLimitOptions.CommentCreationPolicy)]
     public async Task<ActionResult<CommentResponse>> CreateAsync(Guid videoId, CreateCommentRequest request, CancellationToken ct)
     {
         var result = await content.CreateCommentAsync(UserId, videoId, request, ct);

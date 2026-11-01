@@ -893,7 +893,9 @@ export class WatchPage {
         this.commentText = '';
         this.video.update(video => video ? { ...video, stats: { ...video.stats, comments: video.stats.comments + 1 } } : video);
       },
-      error: error => this.actionMessage.set(this.readError(error) || this.i18n.t('watch.commentError'))
+      error: error => this.actionMessage.set(error?.status === 429
+        ? this.i18n.t('watch.commentRateLimited')
+        : this.readError(error) || this.i18n.t('watch.commentError'))
     });
   }
 
@@ -1033,7 +1035,8 @@ export class WatchPage {
         this.actionMessage.set(this.i18n.t('watch.replySaved'));
       },
       error: error => this.replyError.set(error?.error?.code === 'INVALID_COMMENT'
-        ? this.i18n.t('watch.replyInvalid') : errorMessage(error, this.i18n))
+        ? this.i18n.t('watch.replyInvalid')
+        : error?.status === 429 ? this.i18n.t('watch.commentRateLimited') : errorMessage(error, this.i18n))
     });
   }
 

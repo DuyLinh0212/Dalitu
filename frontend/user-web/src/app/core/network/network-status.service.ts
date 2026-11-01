@@ -70,7 +70,7 @@ export class NetworkStatusService implements OnDestroy {
       signal: controller.signal,
     })
       .then(response => {
-        if (!response.ok) throw new Error('API_UNAVAILABLE');
+        if (!response.ok && response.status !== 429) throw new Error('API_UNAVAILABLE');
         this.markAvailable();
         return true;
       })
