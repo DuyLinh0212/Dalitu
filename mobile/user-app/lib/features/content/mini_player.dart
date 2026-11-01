@@ -39,17 +39,18 @@ class _MiniPlayerState extends State<MiniPlayer> {
       return false;
     }
     final video = session.videoId;
-    WidgetsBinding.instance.scheduleFrame();
-    await WidgetsBinding.instance.endOfFrame.timeout(
-      const Duration(milliseconds: 700),
-    );
-    return mounted && session.videoId == video && session.automaticPipEligible;
+    final ready = await AppPictureInPicture.prepareSurface(_surfaceKey);
+    return ready &&
+        mounted &&
+        session.videoId == video &&
+        session.automaticPipEligible;
   }
 
   Widget _surface(NativeVideoPlayerController player) => KeyedSubtree(
     key: _surfaceKey,
-    child: NativeVideoPlayer(controller: player),
+    child: PipVideoSurface(child: NativeVideoPlayer(controller: player)),
   );
+
   PlaybackSession get session => widget.session;
 
   @override
@@ -65,7 +66,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
         return ColoredBox(
           color: Colors.black,
           child: Center(
-            child: AspectRatio(aspectRatio: 16 / 9, child: _surface(player)),
+            child: AspectRatio(
+              aspectRatio: player.videoSize?.aspectRatio ?? 16 / 9,
+              child: _surface(player),
+            ),
           ),
         );
       }

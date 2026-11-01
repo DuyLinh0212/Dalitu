@@ -1,6 +1,8 @@
 package com.hutube.user_app
 
 import android.content.res.Configuration
+import android.app.PictureInPictureUiState
+import android.os.Build
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,6 +24,16 @@ class MainActivity : FlutterActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         pictureInPicture?.onModeChanged(isInPictureInPictureMode)
+    }
+    override fun onPictureInPictureUiStateChanged(pipState: PictureInPictureUiState) {
+        super.onPictureInPictureUiStateChanged(pipState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && pipState.isTransitioningToPip) {
+            pictureInPicture?.onTransitionStarted()
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        pictureInPicture?.onResume()
     }
     override fun onDestroy() {
         mediaTools?.close()
