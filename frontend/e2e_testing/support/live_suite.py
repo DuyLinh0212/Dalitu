@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import urlsplit,parse_qs
 
 from playwright.sync_api import expect
+from support.evidence import screenshot_path
 
 ROOT = Path(__file__).resolve().parents[1]
 VIEWPORTS = {'desktop': {'width':1440,'height':960}, 'mobile': {'width':390,'height':844}, 'tablet': {'width':768,'height':1024}}
@@ -259,7 +260,8 @@ class LiveSuite:
             for dialog in metrics['dialogs']:
                 if dialog['left'] < -1 or dialog['right'] > dimensions['width']+1:
                     failures.append(viewport+': dialog clipped horizontally')
-            path = ROOT/'screenshots'/self.run_id/actor['application']/case['module']/'functional'/case['id']/viewport/(step+'.png')
+            path = ROOT/screenshot_path(self.run_id, self.report['suite'], actor['application'],
+                                        case['id'], step, case['module'], viewport)
             path.parent.mkdir(parents=True,exist_ok=True)
             page.screenshot(path=str(path),full_page=full_page,animations='disabled',mask=[page.locator('input[type=password]')],timeout=45000)
             case['screenshots'].append({'viewport':viewport,'step':step,'path':path.relative_to(ROOT).as_posix(),'metrics':metrics})

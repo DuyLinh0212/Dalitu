@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 from playwright.sync_api import sync_playwright, expect
 from support.local_db import LocalDb
 from support.state import Checkpoint, atomic_json, now
-from support.evidence import auth_relative_path, auth_scope
+from support.evidence import auth_relative_path, auth_scope, run_date_folder
 
 
 def email_link(mail, recipient, origin, timeout_ms):
@@ -57,7 +57,7 @@ def email_otp(mail, recipient, not_before, timeout_ms):
 
 def run(config):
     run_dir = Path(config["run_dir"])
-    screenshots = ROOT / "screenshots" / run_dir.name; screenshots.mkdir(parents=True, exist_ok=True)
+    screenshots = ROOT / "screenshots" / run_date_folder(run_dir.name); screenshots.mkdir(parents=True, exist_ok=True)
     state = Path(config["state_dir"])
     checkpoint = Checkpoint(state / "checkpoint.json", {
         "api_url": config["api_url"], "user_url": config["user_url"], "admin_url": config["admin_url"],

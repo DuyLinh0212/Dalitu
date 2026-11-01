@@ -2,7 +2,7 @@
 
 Luồng browser E2E được duy trì trong thư mục này. CI gọi `run_local.py` để kiểm tra đăng ký, xác minh email và đăng nhập/đăng xuất trên UI thật của User và Admin, cùng API và PostgreSQL local riêng. Runner tự build và khởi động dịch vụ, dùng account test synthetic và checkpoint khi chạy local.
 
-Screenshot nằm ở `screenshots/<run-id>/user|admin/...`; report JSON nằm ở `artifacts/runs/<run-id>/report.json`. Workflow GitHub Actions upload report và screenshot đã tạo thành artifact `hutube-e2e-evidence-*`, kể cả khi suite thất bại. Trace không được upload vì có thể chứa cookie/token; nếu suite dừng trước khi sinh bằng chứng thì bước upload cảnh báo và không làm job thất bại thêm.
+Screenshot có cấu trúc `screenshots/<ngày-run>/<nhóm>/<user|admin|all>/<mã-test-case>/<bước>.png`; thư mục ngày có cả giờ UTC để tách các lượt chạy cùng ngày. Report JSON nằm ở `artifacts/runs/<run-id>/report.json`. GitHub Actions đóng gói report và ảnh trong cùng artifact `hutube-e2e-evidence-*`, kể cả khi suite thất bại, để liên kết ảnh trong Excel trỏ đúng tệp khi tải artifact. Trace không được upload vì có thể chứa cookie/token; nếu suite dừng trước khi sinh bằng chứng thì bước upload cảnh báo và không làm job thất bại thêm.
 
 - [Kịch bản toàn Web](../../docs/WEB_TEST_SCENARIOS.md).
 - [Kịch bản backend, test hiện có và performance](../../docs/BACKEND_TEST_SCENARIOS.md).
@@ -17,8 +17,8 @@ e2e_testing/
   requirements.txt             # Python Playwright pin version
   tests/auth.py                # 14 case auth, real UI + API/database assertions
   support/                    # checkpoint, OS lock, SQL fixture, SPA server
-  screenshots/<run-id>/       # user|admin/module/flow/case-id/step.png (local)
-  screenshots/baseline-auth/   # cùng hierarchy, bộ ảnh minh chứng đã chọn
+  screenshots/<ngày-run>/<nhóm>/<user|admin|all>/<mã-test-case>/*.png
+  screenshots/baseline-auth/Auth/<user|admin>/<mã-test-case>/*.png
   artifacts/runs/<run-id>/     # report, logs, OpenAPI, trace (local, gitignore)
   artifacts/auth-results.md    # báo cáo kiểm chứng không chứa token
   artifacts/latest.json        # trỏ run mới nhất (local, gitignore)
@@ -99,25 +99,20 @@ Get-ChildItem -LiteralPath $report.screenshot_dir -Recurse -File
 & frontend/e2e_testing/.venv/Scripts/python.exe -m playwright show-trace (Join-Path $latest.run_dir 'user-trace.zip')
 ```
 
-`report.json` chứa case/status/duration/user_id/counts và từng screenshot kèm application/module/flow/case/step/viewport/path. `http-statuses.json` chỉ ghi path/status, không query/body/token/cookie. Có screenshot lỗi, desktop/mobile registration/account và Admin account. Ảnh cũ đã được chuyển vào hierarchy mới, baseline giữ cả ảnh đăng ký/verify ban đầu.
+`report.json` chứa case/status/duration/user_id/counts và từng screenshot kèm application/module/flow/case/step/viewport/path. `http-statuses.json` chỉ ghi path/status, không query/body/token/cookie. Tên ảnh gồm application, mã case và bước chụp; report giữ metadata module/flow/viewport.
 
-Cấu trúc phân mục áp dụng cả ảnh PASS và lỗi:
+Cấu trúc thư mục gom ảnh theo ngày chạy, nhóm suite, phạm vi ứng dụng và mã test case:
 
 ```text
-screenshots/<run-id>/
-  user/authentication/
-    registration/AUTH-REG-03/03-register-filled-desktop.png
-    registration/AUTH-REG-03/04-register-filled-mobile.png
-    email_verification/AUTH-VERIFY-01/07-email-verification-success.png
-    login/AUTH-LOGIN-04/11-user-login-success-desktop.png
-    logout/AUTH-LOGIN-06/14-user-logout-guard.png
-  admin/authentication/
-    access_denied/AUTH-ADMIN-01/15-admin-normal-user-denied.png
-    login/AUTH-ADMIN-02/16-admin-login-success-desktop.png
-    logout/AUTH-ADMIN-03/18-admin-logout-guard.png
+screenshots/<ngày-run>/
+  Auth/user/AUTH-REG-03/03-register-filled-desktop.png
+  Auth/admin/AUTH-ADMIN-02/16-admin-login-success-mobile.png
+  Web/admin/A-USERS-SMOKE-01/passed.png
+  CrossApp/all/X-MODERATION-WATCH-01/passed.png
+  Live/all/LIVE-MODERATION-CLAIM-RELEASE-APPROVE/desktop-review.png
 ```
 
-Ảnh đăng ký/verify chỉ có trong run đầu, warm run đánh dấu REUSED không dựng lại ảnh thành công; baseline tổng hợp dẫn tới đúng run gốc. Full suite tương lai dùng module `account`, `channel`, `studio`, `watch`, `playlists`, `plans`, `moderation`… và flow tương ứng, vẫn tách app User/Admin; flow xuyên app chụp riêng mỗi app nhưng chung case/resource ID. Không gom mọi chức năng vào authentication hoặc thư mục ảnh phẳng.
+Ảnh đăng ký/verify chỉ có trong run đầu, warm run đánh dấu REUSED không dựng lại ảnh thành công; baseline tổng hợp dẫn tới đúng run gốc. Mỗi nhóm tương ứng với suite (Auth, Web, RBAC, Live, CrossApp hoặc UIRegression); phạm vi `all` dùng cho test case đi qua cả User và Admin.
 
 Trace ZIP có thể chứa password/token/cookie dù screenshot đã mask; chỉ xem local, không commit/chia sẻ trace chưa lọc. Logs chứa dữ liệu môi trường test, cần xem lại trước chia sẻ. Báo cáo/baseline đã chọn không chứa JWT/verification token/secret production.
 
@@ -129,4 +124,4 @@ $latest = Get-Content frontend/e2e_testing/artifacts/latest.json -Raw | ConvertF
 & frontend/e2e_testing/.venv/Scripts/python.exe frontend/e2e_testing/coverage/verify_catalog.py
 ```
 
-Inventory hiện có 69 khai báo route (có alias/redirect/conditional/duplicate), 854 event bindings, 160 navigation references, 263 form controls, 225 operations API và 152 method test .NET +31 Python. Regex không đo branch coverage: vẫn rà guards, dynamic template/service effects và feature flags. Validator kiểm tra nhóm kịch bản, phụ lục method, link và hierarchy bằng chứng; không xác nhận mọi chức năng đã được chạy. Khi triển khai full suite cần mapping case chi tiết và evidence cho từng mục; hiện status còn PLANNED ngoài auth. Không chạy upload file 99 MB hoặc performance trong lệnh auth này.
+Inventory hiện có 69 khai báo route (có alias/redirect/conditional/duplicate), 854 event bindings, 160 navigation references, 263 form controls, 225 operations API và 152 method test .NET +31 Python. Regex không đo branch coverage: vẫn rà guards, dynamic template/service effects và feature flags. Validator kiểm tra nhóm kịch bản, phụ lục method, link và cấu trúc bằng chứng; không xác nhận mọi chức năng đã được chạy. Khi triển khai full suite cần mapping case chi tiết và evidence cho từng mục; hiện status còn PLANNED ngoài auth. Không chạy upload file 99 MB hoặc performance trong lệnh auth này.

@@ -5,6 +5,7 @@ The local reviewed workbook is authored with export_web_report.mjs.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -12,6 +13,8 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 def export(run):
+    root = Path(__file__).resolve().parents[1]
+    run = Path(run).resolve()
     report = json.loads((run / 'report.json').read_text(encoding='utf-8'))
     if report.get('suite') != 'web':
         raise ValueError('Expected Web suite report')
@@ -41,7 +44,11 @@ def export(run):
                               ('Script: ' + case['script'] + ':' + str(case['script_line'])) if case.get('script') else None]))])
             evidence = case.get('screenshot')
             if evidence:
-                sheet.cell(sheet.max_row, 10).hyperlink = '../../../' + evidence
+                evidence_path = Path(evidence)
+                if not evidence_path.is_absolute():
+                    evidence_path = root / evidence_path
+                relative_link = os.path.relpath(evidence_path, start=run)
+                sheet.cell(sheet.max_row, 10).hyperlink = relative_link.replace('\\', '/')
         sheet.freeze_panes = 'B2'
         sheet.auto_filter.ref = sheet.dimensions
         table = Table(displayName=name+'WebCases', ref=sheet.dimensions)

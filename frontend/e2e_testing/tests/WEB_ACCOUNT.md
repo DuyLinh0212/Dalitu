@@ -63,7 +63,7 @@ Từ root repository, sau khi cung cấp biến môi trường:
   Excel exporter hoặc tích hợp CI. Đây là bộ kiểm tra ban đầu của issue #34.
 
 Kết quả tại `artifacts/runs/<run-id>/report.json`, screenshot tại
-`screenshots/<run-id>/<application>/account/profile/<case-id>/<status>.png`.
+`screenshots/<ngày-run>/Account/<user|admin>/<case-id>/<status>.png`.
 Report ghi `suite=user-account` hoặc `suite=admin-account`; các case User và
 Admin không gộp chung trong một report.
 Tiền điều kiện đăng nhập thất bại được ghi riêng trong `setup`; phần kiểm tra

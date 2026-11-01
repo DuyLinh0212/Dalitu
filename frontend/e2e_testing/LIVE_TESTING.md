@@ -41,7 +41,7 @@ Sau khi ngắt subscription, `--recover-subscription-run <run-dir>` kiểm tra a
 
 Fixture mới được đặt tên theo run ID. Playlist và video riêng tư được xóa trong `finally`; preference/profile được khôi phục; category/plan được archive; role mới không có user được xóa. Với run bị gián đoạn, dùng `--recover-run frontend/e2e_testing/artifacts/runs/<run-id>` để thu dọn category/plan/role đã ghi checkpoint. Recovery kiểm tra ID, prefix, quota/default plan và role chưa được gán trước khi thay đổi.
 
-Report nằm trong `artifacts/runs/<run-id>/report.json` và `http-statuses.json`; ảnh nằm trong `screenshots/<run-id>/.../<viewport>/`. Các thư mục này được ignore vì chứa dữ liệu của môi trường test. Không commit bản chụp tài khoản thật.
+Report nằm trong `artifacts/runs/<run-id>/report.json` và `http-statuses.json`; ảnh nằm tại `screenshots/<ngày-run>/Live/<user|admin|all>/<case-id>/<viewport>-<step>.png`. Các thư mục này được ignore vì chứa dữ liệu của môi trường test. Không commit bản chụp tài khoản thật.
 
 Các run mới lưu browser version và snapshot `.py` cùng SHA-256 trong `test-sources/`, giúp xác định test implementation tại lúc chạy kể cả khi sửa harness sau đó. Muốn xem thao tác trực tiếp, dùng `--headed`; mỗi context test có cookie/storage riêng. Không kiểm tra frontend bằng API mock hay SQL trực tiếp.
 

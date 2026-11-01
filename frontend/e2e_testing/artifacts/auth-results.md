@@ -32,29 +32,29 @@ REUSED gồm AUTH-REG-03, AUTH-LOGIN-01 và AUTH-VERIFY-01: tiền điều kiệ
 
 ## Ảnh minh chứng
 
-Cấu trúc: `screenshots/<run-id>/user|admin/<module>/<flow>/<case-id>/<step>.png`; baseline giữ cùng hierarchy. Module hiện có là authentication; flow registration/email_verification/login/logout/access_denied. Mỗi case là một mục; tên bước phân biệt desktop/mobile, trạng thái success/error.
+Ảnh run được lưu theo cấu trúc `screenshots/<ngày-run>/Auth/<user|admin>/<case-id>/<step>.png`; baseline dùng `screenshots/baseline-auth/Auth/<user|admin>/<case-id>/<step>.png`. Thư mục ngày kèm giờ UTC để phân biệt các lượt chạy trong cùng ngày.
 
 | Phạm vi | Module | Flow | Case | Screenshot | Run nguồn |
 | --- | --- | --- | --- | --- | --- |
-| admin | authentication | access_denied | AUTH-ADMIN-01 | [15-admin-normal-user-denied.png](../screenshots/baseline-auth/admin/authentication/access_denied/AUTH-ADMIN-01/15-admin-normal-user-denied.png) | `20261002T072845.372557Z` |
-| admin | authentication | login | AUTH-ADMIN-02 | [16-admin-login-success-desktop.png](../screenshots/baseline-auth/admin/authentication/login/AUTH-ADMIN-02/16-admin-login-success-desktop.png) | `20261002T072845.372557Z` |
-| admin | authentication | login | AUTH-ADMIN-02 | [17-admin-login-success-mobile.png](../screenshots/baseline-auth/admin/authentication/login/AUTH-ADMIN-02/17-admin-login-success-mobile.png) | `20261002T072845.372557Z` |
-| admin | authentication | logout | AUTH-ADMIN-03 | [18-admin-logout-guard.png](../screenshots/baseline-auth/admin/authentication/logout/AUTH-ADMIN-03/18-admin-logout-guard.png) | `20261002T072845.372557Z` |
-| user | authentication | email_verification | AUTH-VERIFY-01 | [07-email-verification-success.png](../screenshots/baseline-auth/user/authentication/email_verification/AUTH-VERIFY-01/07-email-verification-success.png) | `20261002T050603.730539Z` |
-| user | authentication | login | AUTH-LOGIN-01 | [06-login-unverified-denied.png](../screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-01/06-login-unverified-denied.png) | `20261002T050603.730539Z` |
-| user | authentication | login | AUTH-LOGIN-02 | [09-login-required-fields.png](../screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-02/09-login-required-fields.png) | `20261002T072845.372557Z` |
-| user | authentication | login | AUTH-LOGIN-03 | [10-login-wrong-password.png](../screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-03/10-login-wrong-password.png) | `20261002T072845.372557Z` |
-| user | authentication | login | AUTH-LOGIN-04 | [11-user-login-success-desktop.png](../screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-04/11-user-login-success-desktop.png) | `20261002T072845.372557Z` |
-| user | authentication | login | AUTH-LOGIN-04 | [12-user-login-success-mobile.png](../screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-04/12-user-login-success-mobile.png) | `20261002T072845.372557Z` |
-| user | authentication | login | AUTH-LOGIN-05 | [13-user-session-restored.png](../screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-05/13-user-session-restored.png) | `20261002T072845.372557Z` |
-| user | authentication | logout | AUTH-LOGIN-06 | [14-user-logout-guard.png](../screenshots/baseline-auth/user/authentication/logout/AUTH-LOGIN-06/14-user-logout-guard.png) | `20261002T072845.372557Z` |
-| user | authentication | registration | AUTH-REG-01 | [01-register-required-fields.png](../screenshots/baseline-auth/user/authentication/registration/AUTH-REG-01/01-register-required-fields.png) | `20261002T072845.372557Z` |
-| user | authentication | registration | AUTH-REG-02 | [02-register-password-mismatch.png](../screenshots/baseline-auth/user/authentication/registration/AUTH-REG-02/02-register-password-mismatch.png) | `20261002T072845.372557Z` |
-| user | authentication | registration | AUTH-REG-03 | [03-register-filled-desktop.png](../screenshots/baseline-auth/user/authentication/registration/AUTH-REG-03/03-register-filled-desktop.png) | `20261002T072845.372557Z` |
-| user | authentication | registration | AUTH-REG-03 | [04-register-filled-mobile.png](../screenshots/baseline-auth/user/authentication/registration/AUTH-REG-03/04-register-filled-mobile.png) | `20261002T072845.372557Z` |
-| user | authentication | registration | AUTH-REG-03 | [05-register-success.png](../screenshots/baseline-auth/user/authentication/registration/AUTH-REG-03/05-register-success.png) | `20261002T050603.730539Z` |
-| user | authentication | registration | AUTH-REG-04 | [08-register-duplicate-denied.png](../screenshots/baseline-auth/user/authentication/registration/AUTH-REG-04/08-register-duplicate-denied.png) | `20261002T072845.372557Z` |
+| admin | authentication | access_denied | AUTH-ADMIN-01 | [15-admin-normal-user-denied.png](../screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-01/15-admin-normal-user-denied.png) | `20261002T072845.372557Z` |
+| admin | authentication | login | AUTH-ADMIN-02 | [16-admin-login-success-desktop.png](../screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-02/16-admin-login-success-desktop.png) | `20261002T072845.372557Z` |
+| admin | authentication | login | AUTH-ADMIN-02 | [17-admin-login-success-mobile.png](../screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-02/17-admin-login-success-mobile.png) | `20261002T072845.372557Z` |
+| admin | authentication | logout | AUTH-ADMIN-03 | [18-admin-logout-guard.png](../screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-03/18-admin-logout-guard.png) | `20261002T072845.372557Z` |
+| user | authentication | email_verification | AUTH-VERIFY-01 | [07-email-verification-success.png](../screenshots/baseline-auth/Auth/user/AUTH-VERIFY-01/07-email-verification-success.png) | `20261002T050603.730539Z` |
+| user | authentication | login | AUTH-LOGIN-01 | [06-login-unverified-denied.png](../screenshots/baseline-auth/Auth/user/AUTH-LOGIN-01/06-login-unverified-denied.png) | `20261002T050603.730539Z` |
+| user | authentication | login | AUTH-LOGIN-02 | [09-login-required-fields.png](../screenshots/baseline-auth/Auth/user/AUTH-LOGIN-02/09-login-required-fields.png) | `20261002T072845.372557Z` |
+| user | authentication | login | AUTH-LOGIN-03 | [10-login-wrong-password.png](../screenshots/baseline-auth/Auth/user/AUTH-LOGIN-03/10-login-wrong-password.png) | `20261002T072845.372557Z` |
+| user | authentication | login | AUTH-LOGIN-04 | [11-user-login-success-desktop.png](../screenshots/baseline-auth/Auth/user/AUTH-LOGIN-04/11-user-login-success-desktop.png) | `20261002T072845.372557Z` |
+| user | authentication | login | AUTH-LOGIN-04 | [12-user-login-success-mobile.png](../screenshots/baseline-auth/Auth/user/AUTH-LOGIN-04/12-user-login-success-mobile.png) | `20261002T072845.372557Z` |
+| user | authentication | login | AUTH-LOGIN-05 | [13-user-session-restored.png](../screenshots/baseline-auth/Auth/user/AUTH-LOGIN-05/13-user-session-restored.png) | `20261002T072845.372557Z` |
+| user | authentication | logout | AUTH-LOGIN-06 | [14-user-logout-guard.png](../screenshots/baseline-auth/Auth/user/AUTH-LOGIN-06/14-user-logout-guard.png) | `20261002T072845.372557Z` |
+| user | authentication | registration | AUTH-REG-01 | [01-register-required-fields.png](../screenshots/baseline-auth/Auth/user/AUTH-REG-01/01-register-required-fields.png) | `20261002T072845.372557Z` |
+| user | authentication | registration | AUTH-REG-02 | [02-register-password-mismatch.png](../screenshots/baseline-auth/Auth/user/AUTH-REG-02/02-register-password-mismatch.png) | `20261002T072845.372557Z` |
+| user | authentication | registration | AUTH-REG-03 | [03-register-filled-desktop.png](../screenshots/baseline-auth/Auth/user/AUTH-REG-03/03-register-filled-desktop.png) | `20261002T072845.372557Z` |
+| user | authentication | registration | AUTH-REG-03 | [04-register-filled-mobile.png](../screenshots/baseline-auth/Auth/user/AUTH-REG-03/04-register-filled-mobile.png) | `20261002T072845.372557Z` |
+| user | authentication | registration | AUTH-REG-03 | [05-register-success.png](../screenshots/baseline-auth/Auth/user/AUTH-REG-03/05-register-success.png) | `20261002T050603.730539Z` |
+| user | authentication | registration | AUTH-REG-04 | [08-register-duplicate-denied.png](../screenshots/baseline-auth/Auth/user/AUTH-REG-04/08-register-duplicate-denied.png) | `20261002T072845.372557Z` |
 
-Ảnh được copy nguyên bản từ Playwright, password input được mask; không lấy từ ảnh dựng hoặc UI mock. Baseline chỉ có account synthetic. Report/trace/log đầy đủ ở `artifacts/runs/<run-id>` local bị gitignore; ảnh run mới ở `screenshots/<run-id>`. Không publish state, mail token hay trace chứa cookie/password. JSON đã lọc ở [auth-evidence.json](auth-evidence.json).
+Ảnh được copy nguyên bản từ Playwright, password input được mask; không lấy từ ảnh dựng hoặc UI mock. Baseline chỉ có account synthetic. Report/trace/log đầy đủ ở `artifacts/runs/<run-id>` local bị gitignore; ảnh run mới ở `screenshots/<ngày-run>/Auth/<user|admin>/<case-id>`. Không publish state, mail token hay trace chứa cookie/password. JSON đã lọc ở [auth-evidence.json](auth-evidence.json).
 
 Kết quả này chỉ chứng minh các case auth liệt kê. Chưa chạy full chức năng Web, upload/transcode, OAuth/R2/SePay thật hoặc performance. Steps, dữ liệu và expected của full suite ở hai tài liệu trong `docs`; hướng dẫn chạy ở [README](../README.md).

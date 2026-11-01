@@ -41,7 +41,7 @@ FFmpeg/ffprobe cần trong PATH. CI dùng Chromium qua `python -m playwright ins
 
 - `artifacts/web-latest.json`: lần chạy Web mới nhất, độc lập Auth `latest.json`.
 - `artifacts/runs/<run-id>/report.json`, `user-report.json`, `admin-report.json`.
-- `screenshots/<run-id>/<user|admin>/<module>/functional/<case-id>/<status>.png`.
+- `screenshots/<ngày-run>/Web/<user|admin|all>/<case-id>/<status>.png`.
 - `.state/web-fixtures.json`: ID tài nguyên chính, giữ để retry không tạo trùng.
 
 Member tạm, bình luận, playlist item và playlist phụ được dọn sau test; kênh/video/playlist chính

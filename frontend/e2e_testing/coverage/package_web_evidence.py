@@ -20,7 +20,7 @@ def main():
     run = args.run or Path(json.loads((ROOT / 'artifacts/web-latest.json').read_text(encoding='utf-8'))['run_dir'])
     report = json.loads((run / 'report.json').read_text(encoding='utf-8'))
     assert report['suite'] == 'web' and not report.get('run_error')
-    files = {args.workbook.name: args.workbook.resolve()}
+    files['artifacts/runs/' + report['run_id'] + '/' + args.workbook.name] = args.workbook.resolve()
     referenced = {}
 
     def add_image(case):

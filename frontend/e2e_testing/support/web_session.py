@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright, expect
+from support.evidence import screenshot_path
 
 
 def run_suite(application, run_checks):
@@ -37,11 +38,12 @@ def run_suite(application, run_checks):
             # Assertion text can contain personal data; record type only.
             entry['error_type'] = type(error).__name__
             entry['status'] = on_failure
-        shot = root / 'screenshots' / run_id / application / 'account' / 'profile' / case_id / (entry['status'] + '.png')
+        shot = root / screenshot_path(run_id, application + '-account', application,
+                                      case_id, entry['status'], 'account')
         shot.parent.mkdir(parents=True, exist_ok=True)
         try:
             page.screenshot(path=str(shot), full_page=True, animations='disabled', mask=[page.locator('input[type=password]')])
-            entry['screenshot'] = str(shot)
+            entry['screenshot'] = shot.relative_to(root).as_posix()
         except Exception:
             entry['screenshot_error'] = True
         print(case_id, entry['status'], flush=True)

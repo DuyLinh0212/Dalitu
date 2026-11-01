@@ -307,6 +307,9 @@ jobs:
       - name: Verify player menu, comments and hourly analytics
         if: ${{ !cancelled() && steps.e2e_setup.outcome == 'success' }}
         run: python scripts/ui-regression/player-hourly-comments.py --root frontend/user-web/dist/user-web/browser --video mobile/user-app/test/fixtures/download-sample.mp4 --artifacts frontend/e2e_testing/artifacts/player-hourly
+      - name: Organize UI regression screenshots
+        if: ${{ !cancelled() && steps.e2e_setup.outcome == 'success' }}
+        run: python frontend/e2e_testing/coverage/package_regression_screenshots.py
       - name: Export User and Admin Excel report
         if: ${{ !cancelled() && steps.e2e_setup.outcome == 'success' }}
         run: python frontend/e2e_testing/coverage/export_ci_report.py
@@ -328,18 +331,7 @@ jobs:
             frontend/e2e_testing/artifacts/watch-recommendations/**/*.json
             frontend/e2e_testing/artifacts/channel-watch-scroll/**/*.json
             frontend/e2e_testing/artifacts/player-hourly/**/*.json
-          if-no-files-found: warn
-          retention-days: 14
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: hutube-e2e-screenshots-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            frontend/e2e_testing/screenshots/20*/**/*.png
-            frontend/e2e_testing/artifacts/chunk-recovery/**/*.png
-            frontend/e2e_testing/artifacts/watch-recommendations/**/*.png
-            frontend/e2e_testing/artifacts/channel-watch-scroll/**/*.png
-            frontend/e2e_testing/artifacts/player-hourly/**/*.png
+            frontend/e2e_testing/screenshots/*/*/*/*/*.png
           if-no-files-found: warn
           compression-level: 0
           retention-days: 14

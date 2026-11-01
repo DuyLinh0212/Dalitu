@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from playwright.sync_api import expect
+from support.evidence import screenshot_path
 from support.local_db import LocalDb
 from support.state import atomic_json, now
 
@@ -136,7 +137,9 @@ class WebSuite:
                 entry['actual'] = str(error)[:1500]
         entry['duration_ms'] = round((time.monotonic() - started) * 1000)
         entry['viewport'] = actor['page'].viewport_size
-        destination = self.root / 'screenshots' / self.run_id / actor['application'] / entry['module'] / 'functional' / case_id / (entry['status'] + '.png')
+        destination = self.root / screenshot_path(self.run_id, self.report['suite'],
+                                                   actor['application'], case_id,
+                                                   entry['status'], entry['module'])
         destination.parent.mkdir(parents=True, exist_ok=True)
         try:
             actor['page'].screenshot(path=str(destination), full_page=True, animations='disabled', mask=[actor['page'].locator('input[type=password]')])

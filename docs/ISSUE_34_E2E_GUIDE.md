@@ -24,7 +24,7 @@ Tài liệu tải về và `docs/WEB_TEST_SCENARIOS.md` có cùng nội dung the
 | Runner | `run_local.py --suite web`; build .NET/Angular, PostgreSQL riêng, migrate, start/stop server | Không dùng `--reuse-build` sau khi đổi source ứng dụng |
 | Test thực thi | `tests/web_all.py` gọi các module User/Admin/cross-app; Auth giữ riêng | Các nhánh còn lại trong WEB_E2E_PROGRESS.md |
 | Account/checkpoint | `support/web_suite.py`, fixtures synthetic cố định; dữ liệu pagination riêng | REUSED chỉ kiểm tra dữ liệu tồn tại, không cộng vào thao tác tạo mới |
-| Screenshot | `screenshots/<run>/<user|admin>/<module>/functional/<case>/<status>.png` | Verifier kiểm tra PNG và report, không chứng minh full coverage |
+| Screenshot | `screenshots/<ngày-run>/<nhóm>/<user|admin|all>/<case>/<step>.png` | Verifier kiểm tra PNG và report, không chứng minh full coverage |
 | Kết quả | report tổng và User/Admin riêng; Excel 10 cột theo mẫu | Workbook chỉ phản ánh case đã triển khai |
 | CI | Thêm Web, exporter openpyxl, verifier và upload XLSX/CSV/PNG | Workflow đã chỉnh local; chưa push/chạy GitHub Actions |
 | Inventory | 75 route declarations; bindings/navigation/controls và OpenAPI runtime đã regenerate | Catalog lexical vẫn cần reconcile assertion/branch thủ công |
@@ -250,15 +250,14 @@ artifacts/runs/<run-id>/
   http-statuses.json
   run-manifest.json
   HuTube_Web_Testcase.xlsx
-screenshots/<run-id>/
-  user/account/profile/U-ACCOUNT.01-save-bio/01-saved-desktop.png
-  user/account/profile/U-ACCOUNT.01-save-bio/02-reloaded-desktop.png
-  admin/moderation/approval/A-MODERATION.01/01-approved-desktop.png
+screenshots/<ngày-run>/
+  Account/user/U-ACCOUNT.01-save-bio/01-saved-desktop.png
+  CrossApp/all/X-MODERATION-WATCH-01/01-approved-desktop.png
 ```
 
-Giữ hierarchy hiện tại; mỗi capture ghi app/module/flow/case/step/viewport vào JSON. Chụp trước/sau và lỗi/modal khi có ích; mask password và dữ liệu nhạy cảm hiển thị. Capture một viewport không thay thế việc tương tác kiểm thử trên mobile/tablet.
+Lưu ảnh theo ngày-run/nhóm/phạm vi/case; tên file ghi bước chụp và viewport, JSON giữ metadata module/flow. Chụp trước/sau và lỗi/modal khi có ích; mask password và dữ liệu nhạy cảm hiển thị. Capture một viewport không thay thế việc tương tác kiểm thử trên mobile/tablet.
 
-Workbook và screenshot nằm ở hai cây thư mục; xác định link tương đối từ vị trí workbook trong artifact giải nén hoặc thêm README hướng dẫn root artifact. Kiểm tra link bằng giải nén artifact thử, không dùng absolute path máy Windows trong file bàn giao.
+Workbook và screenshot được đưa vào cùng artifact để link tương đối trong Excel tiếp tục trỏ tới đúng ảnh sau khi tải và giải nén. Exporter tính đường dẫn từ thư mục workbook tới cây `screenshots`; không ghi đường dẫn tuyệt đối trên máy chạy.
 
 ## 9. Nối vào GitHub Actions
 
@@ -272,7 +271,7 @@ frontend/e2e_testing/artifacts/runs/*/run-manifest.json
 frontend/e2e_testing/artifacts/runs/*/http-statuses.json
 ```
 
-Giữ `report.json` và `screenshots/20*/**`, `if: always()`, retention đã cấu hình. Mỗi job chỉ tạo run của chính nó; nếu dùng cache/build download, không cache thư mục artifacts/runs làm dữ liệu đầu vào báo cáo. Trace/mail/checkpoint không đưa nguyên vào artifact công khai vì chứa token/cookie/password.
+Đóng gói `report.json`, `screenshots/*/*/*/*/*.png` và ảnh kiểm tra giao diện đã được đưa về cùng cấu trúc vào một artifact, với `if: always()` và retention đã cấu hình. Mỗi job chỉ tạo run của chính nó; nếu dùng cache/build download, không cache thư mục artifacts/runs làm dữ liệu đầu vào báo cáo. Trace/mail/checkpoint không đưa nguyên vào artifact công khai vì chứa token/cookie/password.
 
 Job e2e hiện `needs: [backend, web]`, chạy sau hai nhóm đó. Nếu chúng fail trước thì e2e không chạy và không có screenshot; báo rõ thay vì khẳng định mọi CI thất bại đều có ảnh browser.
 

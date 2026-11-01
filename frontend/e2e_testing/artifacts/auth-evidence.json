@@ -247,7 +247,7 @@
   ],
   "screenshots": [
     {
-      "file": "screenshots/baseline-auth/admin/authentication/access_denied/AUTH-ADMIN-01/15-admin-normal-user-denied.png",
+      "file": "screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-01/15-admin-normal-user-denied.png",
       "run_id": "20261002T072845.372557Z",
       "application": "admin",
       "module": "authentication",
@@ -255,7 +255,7 @@
       "case_id": "AUTH-ADMIN-01"
     },
     {
-      "file": "screenshots/baseline-auth/admin/authentication/login/AUTH-ADMIN-02/16-admin-login-success-desktop.png",
+      "file": "screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-02/16-admin-login-success-desktop.png",
       "run_id": "20261002T072845.372557Z",
       "application": "admin",
       "module": "authentication",
@@ -263,7 +263,7 @@
       "case_id": "AUTH-ADMIN-02"
     },
     {
-      "file": "screenshots/baseline-auth/admin/authentication/login/AUTH-ADMIN-02/17-admin-login-success-mobile.png",
+      "file": "screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-02/17-admin-login-success-mobile.png",
       "run_id": "20261002T072845.372557Z",
       "application": "admin",
       "module": "authentication",
@@ -271,7 +271,7 @@
       "case_id": "AUTH-ADMIN-02"
     },
     {
-      "file": "screenshots/baseline-auth/admin/authentication/logout/AUTH-ADMIN-03/18-admin-logout-guard.png",
+      "file": "screenshots/baseline-auth/Auth/admin/AUTH-ADMIN-03/18-admin-logout-guard.png",
       "run_id": "20261002T072845.372557Z",
       "application": "admin",
       "module": "authentication",
@@ -279,7 +279,7 @@
       "case_id": "AUTH-ADMIN-03"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/email_verification/AUTH-VERIFY-01/07-email-verification-success.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-VERIFY-01/07-email-verification-success.png",
       "run_id": "20261002T050603.730539Z",
       "application": "user",
       "module": "authentication",
@@ -287,7 +287,7 @@
       "case_id": "AUTH-VERIFY-01"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-01/06-login-unverified-denied.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-LOGIN-01/06-login-unverified-denied.png",
       "run_id": "20261002T050603.730539Z",
       "application": "user",
       "module": "authentication",
@@ -295,7 +295,7 @@
       "case_id": "AUTH-LOGIN-01"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-02/09-login-required-fields.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-LOGIN-02/09-login-required-fields.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -303,7 +303,7 @@
       "case_id": "AUTH-LOGIN-02"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-03/10-login-wrong-password.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-LOGIN-03/10-login-wrong-password.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -311,7 +311,7 @@
       "case_id": "AUTH-LOGIN-03"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-04/11-user-login-success-desktop.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-LOGIN-04/11-user-login-success-desktop.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -319,7 +319,7 @@
       "case_id": "AUTH-LOGIN-04"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-04/12-user-login-success-mobile.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-LOGIN-04/12-user-login-success-mobile.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -327,7 +327,7 @@
       "case_id": "AUTH-LOGIN-04"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/login/AUTH-LOGIN-05/13-user-session-restored.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-LOGIN-05/13-user-session-restored.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -335,7 +335,7 @@
       "case_id": "AUTH-LOGIN-05"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/logout/AUTH-LOGIN-06/14-user-logout-guard.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-LOGIN-06/14-user-logout-guard.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -343,7 +343,7 @@
       "case_id": "AUTH-LOGIN-06"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/registration/AUTH-REG-01/01-register-required-fields.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-REG-01/01-register-required-fields.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -351,7 +351,7 @@
       "case_id": "AUTH-REG-01"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/registration/AUTH-REG-02/02-register-password-mismatch.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-REG-02/02-register-password-mismatch.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -359,7 +359,7 @@
       "case_id": "AUTH-REG-02"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/registration/AUTH-REG-03/03-register-filled-desktop.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-REG-03/03-register-filled-desktop.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -367,7 +367,7 @@
       "case_id": "AUTH-REG-03"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/registration/AUTH-REG-03/04-register-filled-mobile.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-REG-03/04-register-filled-mobile.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",
@@ -375,7 +375,7 @@
       "case_id": "AUTH-REG-03"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/registration/AUTH-REG-03/05-register-success.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-REG-03/05-register-success.png",
       "run_id": "20261002T050603.730539Z",
       "application": "user",
       "module": "authentication",
@@ -383,7 +383,7 @@
       "case_id": "AUTH-REG-03"
     },
     {
-      "file": "screenshots/baseline-auth/user/authentication/registration/AUTH-REG-04/08-register-duplicate-denied.png",
+      "file": "screenshots/baseline-auth/Auth/user/AUTH-REG-04/08-register-duplicate-denied.png",
       "run_id": "20261002T072845.372557Z",
       "application": "user",
       "module": "authentication",

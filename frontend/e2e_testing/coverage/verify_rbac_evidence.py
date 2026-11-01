@@ -5,6 +5,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from support.evidence import run_date_folder
 from tests.rbac_matrix import ACTION_CONTROLS, CATALOGUE_ONLY, ROUTES
 
 
@@ -42,7 +43,9 @@ def verify(run_dir):
     for case in cases:
         assert case['status'] == 'passed', case['id']
         screenshot = (ROOT / case['screenshot']).resolve()
-        assert screenshot.is_relative_to((ROOT / 'screenshots' / report['run_id']).resolve())
+        relative = screenshot.relative_to((ROOT / 'screenshots').resolve()).parts
+        assert relative[0] == run_date_folder(report['run_id'])
+        assert relative[1] == 'RBAC' and relative[2] == 'admin' and relative[3] == case['id']
         assert screenshot.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n', case['id']
         assert case['business_endpoint_available'] == (case['permission'] not in CATALOGUE_ONLY)
     assert len(coverage['requests']) == len(codes) * 4

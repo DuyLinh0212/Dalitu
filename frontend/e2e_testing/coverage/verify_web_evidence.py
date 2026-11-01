@@ -2,6 +2,11 @@
 import argparse
 import json
 from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from support.evidence import run_date_folder
 
 
 def main():
@@ -25,9 +30,11 @@ def main():
     for case in report['cases']:
         assert case['status'] in ('passed','failed','blocked','reused')
         path=(root/case['screenshot']).resolve()
-        assert path.is_relative_to((root/'screenshots'/report['run_id']).resolve())
+        relative=path.relative_to((root/'screenshots').resolve()).parts
+        assert relative[0] == run_date_folder(report['run_id'])
+        assert relative[2] in ('admin','user','all')
+        assert relative[3] == case['id']
         assert path.read_bytes()[:8]==b'\x89PNG\r\n\x1a\n'
-        assert path.parts[-4:-1]==(case['module'],'functional',case['id'])
         first=case.get('first_passed_evidence')
         if first:
             original=(root/first['screenshot']).resolve()

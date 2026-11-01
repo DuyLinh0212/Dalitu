@@ -3,6 +3,11 @@ import argparse,hashlib,json,re,shutil
 from collections import Counter
 from datetime import datetime,timezone
 from pathlib import Path
+import sys
+
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
+from support.evidence import run_date_folder
 
 REPO=Path(__file__).resolve().parents[3]
 EXCLUDED=['A-CF.01','A-CF.02','A-RECOMMENDATION.03']
@@ -18,7 +23,8 @@ def main():
         if not report.get('finished_at'):active.append(directory.name);continue
         target=destination/'artifacts/runs'/directory.name
         if not target.exists():shutil.copytree(directory,target)
-        images=root/'screenshots'/directory.name;image_target=destination/'screenshots'/directory.name
+        image_folder=run_date_folder(directory.name)
+        images=root/'screenshots'/image_folder;image_target=destination/'screenshots'/image_folder
         if images.exists() and not image_target.exists():shutil.copytree(images,image_target)
         runs.append({'run_id':directory.name,'device':device,'raw_counts':{s:report.get(s,0) for s in ['passed','failed','blocked']},'report':str(target/'report.json')})
         for execution in report.get('group_executions',[]):

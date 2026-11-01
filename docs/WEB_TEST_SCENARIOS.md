@@ -134,7 +134,7 @@ Issue link nếu FAIL hoặc BLOCKED
 Evidence tự động:
 
 ~~~text
-frontend/e2e_testing/screenshots/<run-id>/<user|admin>/<module>/<flow>/<case-id>/<viewport>/<step>.png
+frontend/e2e_testing/screenshots/<ngày-run>/<nhóm>/<user|admin|all>/<case-id>/<viewport>-<step>.png
 frontend/e2e_testing/artifacts/runs/<run-id>/report.json
 frontend/e2e_testing/artifacts/runs/<run-id>/http-statuses.json
 ~~~

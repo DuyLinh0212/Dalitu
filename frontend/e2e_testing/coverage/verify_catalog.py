@@ -28,17 +28,19 @@ def main():
     for item in evidence['screenshots']:
         path = ROOT / item['file']
         assert path.is_file() and path.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n'
-        parts = path.relative_to(ROOT / 'screenshots/baseline-auth').parts
-        assert parts[:4] == (item['application'], item['module'], item['flow'], item['case_id'])
+        assert path.parent.name == item['case_id']
+        assert path.parent.parent.name == item['application']
+        assert path.parent.parent.parent.name == 'Auth'
     latest = read('artifacts/latest.json')
     report = json.loads((Path(latest['run_dir']) / 'report.json').read_text(encoding='utf-8'))
     assert report['failed'] == 0 and report['passed'] + report['reused'] == 14
     assert report['account_count'] == 1 and report['created_account_count'] in (0, 1)
     assert len(report['cases']) == 14 and not report['javascript_errors']
     for screenshot in report['screenshots']:
-        assert (Path(report['screenshot_dir']) / screenshot['path']).is_file()
-        assert screenshot['path'].split('/')[:4] == [screenshot['application'], screenshot['module'],
-                                                    screenshot['flow'], screenshot['case_id']]
+        path = Path(report['screenshot_dir']) / screenshot['path']
+        assert path.is_file()
+        parts = path.relative_to(Path(report['screenshot_dir'])).parts
+        assert parts[:3] == ('Auth', screenshot['application'], screenshot['case_id'])
     documents = list(ROOT.rglob('*.md')) + [REPO / 'docs/WEB_TEST_SCENARIOS.md', REPO / 'docs/BACKEND_TEST_SCENARIOS.md']
     for document in documents:
         if any(part in ('.state', '.venv', 'runs') for part in document.relative_to(REPO).parts):
