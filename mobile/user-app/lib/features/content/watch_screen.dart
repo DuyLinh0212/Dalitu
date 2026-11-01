@@ -2587,6 +2587,7 @@ class _CustomVideoStage extends StatefulWidget {
 }
 
 class _CustomVideoStageState extends State<_CustomVideoStage> {
+  NativeVideoPlayer? _nativeSurface;
   bool _controlsVisible = true;
   Timer? _controlsTimer;
   bool? _seekForward;
@@ -2705,6 +2706,12 @@ class _CustomVideoStageState extends State<_CustomVideoStage> {
     builder: (context, _) {
       final player = widget.session.player;
       if (player == null) return const ColoredBox(color: AppColors.ink);
+      // Only controls need rebuilding on progress ticks. Keep the native
+      // widget identical until its controller changes; inherited layout/theme
+      // changes still reach the mounted native widget normally.
+      if (_nativeSurface?.controller != player) {
+        _nativeSurface = NativeVideoPlayer(controller: player);
+      }
       final total = widget.session.duration.inMilliseconds;
       final current =
           (_dragPosition ?? widget.session.position.inMilliseconds.toDouble())
@@ -2796,7 +2803,7 @@ class _CustomVideoStageState extends State<_CustomVideoStage> {
                         aspectRatio: videoAspect,
                         child: RepaintBoundary(
                           key: widget.surfaceKey,
-                          child: PipVideoSurface(child: NativeVideoPlayer(controller: player)),
+                          child: PipVideoSurface(child: _nativeSurface!),
                         ),
                       ),
                     ),

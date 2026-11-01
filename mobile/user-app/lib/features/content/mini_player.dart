@@ -19,6 +19,7 @@ class MiniPlayer extends StatefulWidget {
 class _MiniPlayerState extends State<MiniPlayer> {
   Alignment _alignment = Alignment.bottomRight;
   final _surfaceKey = GlobalKey();
+  NativeVideoPlayer? _nativeSurface;
   @override
   void initState() {
     super.initState();
@@ -46,10 +47,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
         session.automaticPipEligible;
   }
 
-  Widget _surface(NativeVideoPlayerController player) => KeyedSubtree(
-    key: _surfaceKey,
-    child: PipVideoSurface(child: NativeVideoPlayer(controller: player)),
-  );
+  Widget _surface(NativeVideoPlayerController player) {
+    if (_nativeSurface?.controller != player) {
+      _nativeSurface = NativeVideoPlayer(controller: player);
+    }
+    return KeyedSubtree(
+      key: _surfaceKey,
+      child: PipVideoSurface(child: _nativeSurface!),
+    );
+  }
 
   PlaybackSession get session => widget.session;
 

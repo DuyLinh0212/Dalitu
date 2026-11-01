@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:better_native_video_player/better_native_video_player.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -18,6 +20,7 @@ import 'package:user_app/features/content/local_download_manager.dart';
 import 'package:user_app/features/content/offline_player_screen.dart';
 import 'package:user_app/features/content/media_entitlements.dart';
 import 'package:user_app/features/content/playback_session.dart';
+import 'package:user_app/features/content/mini_player.dart';
 import 'package:user_app/features/content/video_card.dart';
 import 'package:user_app/features/notifications/notification_center.dart';
 import 'package:user_app/features/notifications/notifications_screen.dart';
@@ -65,6 +68,80 @@ class CountingAuth extends AuthController {
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+
+  for (final mini in [false, true]) {
+    testWidgets(
+      'progress updates do not rebuild the native video widget: mini=$mini',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          const MethodChannel('native_video_player'),
+          (_) async => null,
+        );
+        final client = MockClient(
+          (request) async => request.url.path.endsWith('/videos/perf')
+              ? jsonResponse(video('perf'))
+              : jsonResponse(page([])),
+        );
+        final auth = AuthController(ApiClient(client: client), MemoryStore());
+        final playback = PlaybackSession()
+          ..videoId = 'perf'
+          ..player = NativeVideoPlayerController(id: 9001)
+          ..ready = true
+          ..minimized = mini
+          ..duration = const Duration(seconds: 120);
+        await tester.pumpWidget(
+          app(
+            mini
+                ? MiniPlayer(session: playback)
+                : WatchScreen(auth: auth, playback: playback, videoId: 'perf'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final before = tester.element(find.byType(NativeVideoPlayer));
+        final previousCallback = debugOnRebuildDirtyWidget;
+        var builds = 0;
+        debugOnRebuildDirtyWidget = (element, builtOnce) {
+          if (element.widget is NativeVideoPlayer) builds++;
+          previousCallback?.call(element, builtOnce);
+        };
+        try {
+          for (var tick = 1; tick <= 40; tick++) {
+            playback.position = Duration(milliseconds: tick * 250);
+            playback.notifyListeners();
+            await tester.pump(const Duration(milliseconds: 250));
+          }
+        } finally {
+          debugOnRebuildDirtyWidget = previousCallback;
+        }
+        expect(
+          builds,
+          0,
+          reason: 'Progress belongs to controls, not the native surface',
+        );
+        expect(tester.element(find.byType(NativeVideoPlayer)), same(before));
+        if (mini) {
+          expect(
+            tester
+                .widget<LinearProgressIndicator>(
+                  find.byType(LinearProgressIndicator),
+                )
+                .value,
+            closeTo(10 / playback.duration.inSeconds, .0001),
+          );
+        } else {
+          expect(find.text('0:10'), findsOneWidget);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        playback.dispose();
+        auth.dispose();
+        client.close();
+        await tester.pump();
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+  }
 
   testWidgets('offline player unregisters its account listener when closed', (
     tester,
