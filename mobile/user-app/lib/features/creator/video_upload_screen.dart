@@ -667,7 +667,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
               child: ListView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
                 children: [
                   _FilePicker(
                     customIcon: AppIcons.asset(AppIcons.upload, size: 24),
@@ -689,7 +689,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
                   Text(
                     AppStrings.t('upload.detailsSection'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -708,7 +708,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                         ? AppStrings.t('upload.titleRequired')
                         : null,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   TextFormField(
                     controller: _description,
                     enabled: !_uploading,
@@ -717,9 +717,10 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                     maxLength: 5000,
                     decoration: InputDecoration(
                       labelText: AppStrings.t('creator.descriptionField'),
+                      alignLabelWithHint: true,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   _FilePicker(
                     icon: Icons.image_outlined,
                     title:
@@ -730,8 +731,12 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                         : AppStrings.t('upload.selectedThumbnail'),
                     onTap: _uploading ? null : _pickThumbnail,
                   ),
-                  if (_preparing) const LinearProgressIndicator(),
+                  if (_preparing) ...[
+                    const SizedBox(height: 16),
+                    const LinearProgressIndicator(),
+                  ],
                   if (_metadata != null) ...[
+                    const SizedBox(height: 16),
                     if (_metadata!.thumbnails.isNotEmpty) ...[
                       Text(AppStrings.t('parity.thumbnail')),
                       Wrap(
@@ -792,14 +797,30 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                           : (q) => setState(() => _sourceQuality = q),
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
                   Card(
                     margin: EdgeInsets.zero,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: AppColors.borderFor(context)),
+                    ),
                     child: ExpansionTile(
                       maintainState: true,
+                      shape: const Border(),
+                      collapsedShape: const Border(),
+                      tilePadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       leading: const Icon(Icons.tune_rounded),
                       title: Text(AppStrings.t('upload.optionsSection')),
-                      childrenPadding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      childrenPadding: const EdgeInsets.fromLTRB(
+                        16,
+                        16,
+                        16,
+                        20,
+                      ),
                       children: [
                         DropdownButtonFormField<String>(
                           isExpanded: true,
@@ -830,19 +851,33 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                               : (value) =>
                                     setState(() => _languageCode = value!),
                         ),
+                        const SizedBox(height: 16),
                         SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 8,
+                          ),
                           value: _allowComments,
                           title: Text(AppStrings.t('parity.comments')),
                           onChanged: _uploading
                               ? null
                               : (v) => setState(() => _allowComments = v),
                         ),
-                        PlaylistSelector(
-                          auth: widget.auth,
-                          selected: _playlistIds,
-                          enabled: !_uploading,
-                          onChanged: (values) =>
-                              setState(() => _playlistIds = values),
+                        const SizedBox(height: 12),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: AppColors.borderFor(context),
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: PlaylistSelector(
+                            auth: widget.auth,
+                            selected: _playlistIds,
+                            enabled: !_uploading,
+                            onChanged: (values) =>
+                                setState(() => _playlistIds = values),
+                          ),
                         ),
                         const SizedBox(height: 20),
                         InputDecorator(
@@ -900,14 +935,30 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Card(
                     margin: EdgeInsets.zero,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: AppColors.borderFor(context)),
+                    ),
                     child: ExpansionTile(
                       maintainState: true,
+                      shape: const Border(),
+                      collapsedShape: const Border(),
+                      tilePadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       leading: const Icon(Icons.video_settings_outlined),
                       title: Text(AppStrings.t('upload.advancedSection')),
-                      childrenPadding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      childrenPadding: const EdgeInsets.fromLTRB(
+                        16,
+                        16,
+                        16,
+                        20,
+                      ),
                       children: [
                         Wrap(
                           alignment: WrapAlignment.spaceBetween,
@@ -1113,7 +1164,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   DropdownButtonFormField<String>(
                     isExpanded: true,
                     key: ValueKey('upload-visibility-$_visibility'),
@@ -1139,6 +1190,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                         ? null
                         : (value) => setState(() => _visibility = value!),
                   ),
+                  const SizedBox(height: 16),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: _ageRestricted,
@@ -1150,6 +1202,7 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                       AppStrings.t('upload.ageRestrictionDescription'),
                     ),
                   ),
+                  const SizedBox(height: 12),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: _policyAccepted,
@@ -1211,7 +1264,7 @@ class _FilePicker extends StatelessWidget {
     ),
     clipBehavior: Clip.antiAlias,
     child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       onTap: onTap,
       leading: Container(
         width: 42,
