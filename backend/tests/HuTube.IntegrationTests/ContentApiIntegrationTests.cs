@@ -1583,6 +1583,25 @@ public sealed class ContentApiIntegrationTests(AuthApiFactory factory) : IClassF
         Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
     }
 
+    [Fact]
+    public async Task Comments_AllowTwoIdenticalPostsBeforeFlaggingTheThirdAsSpam()
+    {
+        var (owner, _, channelId) = await CreateUserAndChannelAsync("duplicate_comment_owner");
+        var (viewer, _, _) = await CreateUserAndChannelAsync("duplicate_comment_viewer");
+        var video = await CreatePublishedVideoAsync(owner, channelId, "Repeated comment threshold");
+        var url = $"/api/v1/videos/{video.VideoId}/comments";
+        var request = new { content = "Repeated comment", parentCommentId = (Guid?)null };
+
+        var first = await viewer.PostAsJsonAsync(url, request);
+        var second = await viewer.PostAsJsonAsync(url, request);
+        var third = await viewer.PostAsJsonAsync(url, request);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, third.StatusCode);
+        Assert.Contains("COMMENT_SPAM_DETECTED", await third.Content.ReadAsStringAsync());
+    }
+
     private async Task WaitForReadyRenditionsAsync(Guid videoId, int expectedReadyCount)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(10);

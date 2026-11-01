@@ -354,7 +354,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseMiddleware<ApiRequestTelemetryMiddleware>();
 app.UseMiddleware<ExceptionMiddleware>();
-app.UseRateLimiter(); app.UseAuthentication(); app.UseMiddleware<AdminApiAuditMiddleware>(); app.UseAuthorization();
+app.UseAuthentication(); app.UseRateLimiter(); app.UseMiddleware<AdminApiAuditMiddleware>(); app.UseAuthorization();
 app.UseStatusCodePages(context => ApiErrors.WriteAsync(context.HttpContext, context.HttpContext.Response.StatusCode, "HTTP_ERROR", "Yêu cầu không được xử lý."));
 if (!app.Environment.IsProduction()) {
     app.MapOpenApi();

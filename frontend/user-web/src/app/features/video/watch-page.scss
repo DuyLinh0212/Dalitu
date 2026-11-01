@@ -1083,6 +1083,17 @@
   border-bottom: 1px solid var(--line);
 }
 
+.comment-submit-error {
+  margin: -8px 18px 12px 63px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--line));
+  border-radius: 8px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
 .comment-avatar {
   width: 34px;
   height: 34px;

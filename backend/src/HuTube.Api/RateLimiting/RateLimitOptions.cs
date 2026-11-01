@@ -78,7 +78,7 @@ internal static class RateLimitPolicies
         });
 
     public static RateLimitPartition<string> SlidingWindow(HttpContext context, int permitLimit, TimeSpan window) =>
-        RateLimitPartition.GetSlidingWindowLimiter(ClientKey(context), _ => new SlidingWindowRateLimiterOptions
+        RateLimitPartition.GetSlidingWindowLimiter(CommenterKey(context), _ => new SlidingWindowRateLimiterOptions
         {
             PermitLimit = permitLimit,
             Window = window,
@@ -109,4 +109,11 @@ internal static class RateLimitPolicies
 
     private static string ClientKey(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    private static string CommenterKey(HttpContext context)
+    {
+        var userId = context.User.FindFirst("sub")?.Value
+            ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        return string.IsNullOrWhiteSpace(userId) ? $"ip:{ClientKey(context)}" : $"user:{userId}";
+    }
 }

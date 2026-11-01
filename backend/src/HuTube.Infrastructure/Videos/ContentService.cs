@@ -1647,7 +1647,7 @@ public sealed class ContentService(
                 ?? throw Error(404, "PARENT_COMMENT_NOT_FOUND", "Không tìm thấy bình luận cha.");
         }
         var comment = new Comment { UserId = userId, VideoId = videoId, ParentCommentId = parent?.CommentId, Content = content, Status = "visible", CreatedAt = Now, UpdatedAt = Now };
-        if (await db.Comments.AnyAsync(x => x.UserId == userId && x.VideoId == videoId && x.Content == content && x.CreatedAt > Now.AddSeconds(-10), ct))
+        if (await db.Comments.CountAsync(x => x.UserId == userId && x.VideoId == videoId && x.Content == content && x.CreatedAt > Now.AddSeconds(-10), ct) >= 2)
             throw Error(429, "COMMENT_SPAM_DETECTED", "Bạn đang gửi cùng một bình luận quá nhanh.");
         db.Comments.Add(comment); await db.SaveChangesAsync(ct);
         if (parent != null && parent.UserId != userId)

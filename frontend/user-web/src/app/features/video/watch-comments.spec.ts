@@ -4,7 +4,7 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { EMPTY, NEVER, Subject, of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { ChannelService } from '../../core/channel.service';
-import { CommentItem, ContentService } from '../../core/content.service';
+import { CommentItem, ContentService, VideoDetail } from '../../core/content.service';
 import { I18nService } from '../../core/i18n.service';
 import { LoginPromptService } from '../../core/login-prompt.service';
 import { PictureInPictureService } from '../../core/picture-in-picture.service';
@@ -92,6 +92,17 @@ describe('Watch comment replies', () => {
     page.startReply(root); page.replyText = 'Reply draft'; page.reply(root);
     expect(page.replyText).toBe('Reply draft'); expect(page.replyTo()).toBe('root');
     expect(page.replyError()).toBeTruthy(); expect(page.replyBusy()).toBeNull();
+  });
+
+  it('shows comment rate limits inline beside the composer instead of in the page notice', () => {
+    page.video.set({ videoId: 'video' } as unknown as VideoDetail);
+    page.commentText = 'A new comment';
+    content.createComment.and.returnValue(throwError(() => ({ status: 429 })));
+
+    page.comment();
+
+    expect(page.commentError()).toBe(TestBed.inject(I18nService).t('watch.commentRateLimited'));
+    expect(page.actionMessage()).toBe('');
   });
 
   it('rejects blank and overlong replies without making a request', () => {

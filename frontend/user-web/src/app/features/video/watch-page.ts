@@ -79,6 +79,7 @@ export class WatchPage {
   readonly visibleReplyCounts = signal<Record<string, number>>({});
   readonly replyBusy = signal<string | null>(null);
   readonly replyError = signal('');
+  readonly commentError = signal('');
   private readonly repliesPageSize = 3;
   readonly quality = signal('');
   readonly speed = signal(1);
@@ -884,6 +885,7 @@ export class WatchPage {
     const item = this.video();
     const text = this.commentText.trim();
     if (!item || !text) return;
+    this.commentError.set('');
     this.content.createComment(item.videoId, text).pipe(takeUntil(this.videoChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: comment => {
         this.comments.update(items => [comment, ...items]);
@@ -893,10 +895,14 @@ export class WatchPage {
         this.commentText = '';
         this.video.update(video => video ? { ...video, stats: { ...video.stats, comments: video.stats.comments + 1 } } : video);
       },
-      error: error => this.actionMessage.set(error?.status === 429
+      error: error => this.commentError.set(error?.status === 429
         ? this.i18n.t('watch.commentRateLimited')
         : this.readError(error) || this.i18n.t('watch.commentError'))
     });
+  }
+
+  clearCommentError() {
+    if (this.commentError()) this.commentError.set('');
   }
 
   setCommentSort(sort: 'newest' | 'top') {
