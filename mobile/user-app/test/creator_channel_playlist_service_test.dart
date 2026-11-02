@@ -367,7 +367,7 @@ void main() {
       (
         name: 'lookup channel by handle',
         method: 'GET',
-        path: '/channels/handle/My%20Channel',
+        path: '/channels/handle/my%20channel',
         query: const {},
         body: null,
         listResponse: false,

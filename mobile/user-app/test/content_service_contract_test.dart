@@ -488,6 +488,21 @@ void main() {
                 expect(jsonDecode(request.body), scenario.body);
               }
               if (fail) return jsonResponse({'code': 'CONTENT_FAILED'}, 503);
+              if (scenario.path.endsWith('/download-options')) {
+                return http.Response(
+                  jsonEncode([
+                    {
+                      'quality': '720p',
+                      'width': 1280,
+                      'height': 720,
+                      'fileSize': 1024,
+                      'url': 'https://cdn.test/video-720p.mp4',
+                    },
+                  ]),
+                  200,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
               if (scenario.listResponse) return _list();
               return jsonResponse({});
             });

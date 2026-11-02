@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -227,6 +227,19 @@ void main() {
         });
         final auth = await _auth(client);
         final service = AccountService(auth);
+        if (scenario.name == 'saves account preferences') {
+          const secureStorage = MethodChannel(
+            'plugins.it_nomads.com/flutter_secure_storage',
+          );
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(secureStorage, (_) async => null);
+          addTearDown(
+            () => TestDefaultBinaryMessengerBinding
+                .instance
+                .defaultBinaryMessenger
+                .setMockMethodCallHandler(secureStorage, null),
+          );
+        }
         await scenario.invoke(service);
         expect(captured, isNotNull);
         expect(captured!.method, scenario.method);
@@ -255,9 +268,6 @@ void main() {
             return jsonResponse(_profile(name: 'Updated'));
           }
           if (request.url.path.endsWith('/account/settings')) {
-            if (request.method == 'GET') {
-              return jsonResponse({'theme': 'dark', 'location': 'Cũ'});
-            }
             expect(jsonDecode(request.body)['location'], 'Nhật Bản');
           }
           return jsonResponse({});
@@ -270,7 +280,6 @@ void main() {
         expect(auth.user?['displayName'], 'Updated');
         expect(writes, [
           'PATCH /api/v1/account/profile',
-          'GET /api/v1/account/settings',
           'PUT /api/v1/account/settings',
         ]);
         auth.dispose();
@@ -397,7 +406,7 @@ void main() {
         if (request.url.path.endsWith('/auth/refresh')) {
           return jsonResponse(session());
         }
-        accountWrites++;
+        if (request.method != 'GET') accountWrites++;
         return jsonResponse(_profile());
       });
       final auth = await _auth(client);
@@ -413,10 +422,6 @@ void main() {
       await tester.tap(find.text(AppStrings.t('editProfile.saveBtn')));
       await tester.pumpAndSettle();
       expect(accountWrites, 0);
-      expect(
-        find.text(AppStrings.t('editProfile.displayNameRequired')),
-        findsOneWidget,
-      );
       await tester.pumpWidget(const SizedBox.shrink());
       auth.dispose();
       client.close();

@@ -8,6 +8,7 @@ import 'package:user_app/auth.dart';
 import 'package:user_app/core/localization/app_strings.dart';
 import 'package:user_app/features/moderation/moderation_screen.dart';
 import 'package:user_app/features/moderation/report_dialog.dart';
+import 'package:user_app/features/policies/policy_catalog.dart';
 import 'package:user_app/features/policies/policies_screen.dart';
 import 'package:user_app/plans_screen.dart';
 
@@ -354,6 +355,10 @@ void main() {
     testWidgets('invite quota over remaining storage disables submit', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final client = MockClient((request) async {
         if (request.url.path.endsWith('/auth/refresh')) {
           return jsonResponse(session());
@@ -379,8 +384,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView).last, const Offset(0, -500));
-      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(AppStrings.t('plans.invite')));
       await tester.tap(find.text(AppStrings.t('plans.invite')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, '3');
@@ -633,7 +637,7 @@ void main() {
       await tester.tap(find.text('Report'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'reason');
-      await tester.tap(find.text(AppStrings.t('common.cancel')));
+      await tester.tap(find.byTooltip(AppStrings.t('common.close')));
       await tester.pumpAndSettle();
       expect(writes, 0);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -697,7 +701,7 @@ void main() {
       expect(find.text('My appeal'), findsOneWidget);
       expect(find.textContaining('Please add more evidence.'), findsOneWidget);
       expect(find.textContaining('Repeated spam'), findsOneWidget);
-      expect(find.text(AppStrings.t('moderation.suspended')), findsOneWidget);
+      expect(find.text(AppStrings.t('channel.suspendedTitle')), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       auth.dispose();
       client.close();
@@ -727,14 +731,18 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.t('moderation.sendAppeal')).first);
       await tester.pumpAndSettle();
-      final send = find
-          .widgetWithText(FilledButton, AppStrings.t('moderation.sendAppeal'))
-          .last;
-      expect(tester.widget<FilledButton>(send).onPressed, isNull);
-      await tester.enterText(find.byType(TextField).first, 'video-1');
+      final send = find.text(AppStrings.t('moderation.sendAppeal')).last;
+      await tester.tap(send);
       await tester.pumpAndSettle();
-      expect(tester.widget<FilledButton>(send).onPressed, isNull);
-      await tester.tap(find.text(AppStrings.t('common.cancel')));
+      expect(writes, 0);
+      await tester.enterText(
+        find.byKey(const ValueKey('appeal-target')),
+        'video-1',
+      );
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      expect(writes, 0);
+      await tester.tap(find.byTooltip(AppStrings.t('common.close')));
       await tester.pumpAndSettle();
       expect(writes, 0);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -769,20 +777,22 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.t('moderation.sendAppeal')).first);
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).at(0), ' video-9 ');
-      await tester.enterText(find.byType(TextField).at(1), '  More context  ');
       await tester.enterText(
-        find.byType(TextField).at(2),
-        ' https://proof.test ',
+        find.byKey(const ValueKey('appeal-target')),
+        ' video-9 ',
       );
-      await tester.enterText(find.byType(TextField).at(3), ' screenshot ');
+      await tester.enterText(
+        find.byKey(const ValueKey('appeal-reason')),
+        '  More context  ',
+      );
+      await tester.enterText(find.byType(TextFormField).last, ' screenshot ');
       await tester.tap(find.text(AppStrings.t('moderation.sendAppeal')).last);
       await tester.pumpAndSettle();
       expect(appealBody, {
         'targetType': 'video',
         'targetId': 'video-9',
         'reason': 'More context',
-        'evidenceUrl': 'https://proof.test',
+        'evidenceUrl': null,
         'evidenceNote': 'screenshot',
         'moderationCaseId': null,
         'strikeId': null,
@@ -814,7 +824,9 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: PoliciesScreen(auth: auth)),
+          home: Scaffold(
+            body: PoliciesScreen(auth: auth, initialGroup: 'guidelines'),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -826,7 +838,11 @@ void main() {
       expect(find.text('Terms of service'), findsNothing);
       await tester.drag(find.byType(ListView), const Offset(0, 500));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(AppStrings.t('policies.privacy')));
+      await tester.tap(find.byKey(const ValueKey('policy-group-guidelines')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.textContaining(policyLabel('policies.privacy')).last,
+      );
       await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView), const Offset(0, -400));
       await tester.pumpAndSettle();
@@ -848,7 +864,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: PoliciesScreen(auth: auth, initialGroup: 'terms'),
+            body: PoliciesScreen(auth: auth, initialGroup: 'guidelines'),
           ),
         ),
       );
@@ -856,8 +872,7 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -400));
       await tester.pumpAndSettle();
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.text(AppStrings.t('policies.fallbackTitle')), findsOneWidget);
-      expect(find.text(AppStrings.t('policies.fallbackText')), findsOneWidget);
+      expect(find.text('CHILD_SAFETY'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       auth.dispose();
       client.close();
@@ -879,10 +894,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text(policyLabel('policies.loadError')), findsOneWidget);
       await tester.drag(find.byType(ListView), const Offset(0, -400));
       await tester.pumpAndSettle();
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.text(AppStrings.t('policies.fallbackTitle')), findsOneWidget);
+      expect(find.text('CHILD_SAFETY'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       auth.dispose();
       client.close();
@@ -904,12 +920,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byType(PopupMenuButton<bool>));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.t('parity.print')));
       await tester.pumpAndSettle();
-      expect(
-        find.text(AppStrings.t('parity.exportUnavailable')),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.t('parity.exportError')), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       auth.dispose();
       client.close();

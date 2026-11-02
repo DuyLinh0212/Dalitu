@@ -24,7 +24,7 @@ const _channel = ChannelDetail(
   isOwner: true,
   isSubscribed: false,
   createdAt: '2026-01-01T00:00:00Z',
-  permissions: ['comment.manage'],
+  permissions: ['comment.manage', 'video.edit'],
 );
 
 http.Response _json(Object value, [int status = 200]) => http.Response(
@@ -234,15 +234,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       final actionLabel = AppStrings.t(action.actionLabel);
-      if (action.actionLabel == 'creator.submitReview') {
-        await tester.ensureVisible(find.text(actionLabel));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(actionLabel));
-      } else {
-        await tester.ensureVisible(find.byTooltip(actionLabel));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip(actionLabel));
-      }
+      await tester.tap(find.byTooltip(AppStrings.t('common.moreOptions')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(actionLabel).last);
       await tester.pumpAndSettle();
       expect(requests, contains('POST /api/v1${action.endpoint}'));
       expect(listReads, 2);
