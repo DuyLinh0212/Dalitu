@@ -293,135 +293,139 @@ class _UploadProgressDialog extends StatelessWidget {
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: accent.withValues(alpha: .1),
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(_uploadIcon(c), color: accent, size: 21),
+          constraints: BoxConstraints(
+            maxWidth: 360,
+            maxHeight: MediaQuery.sizeOf(context).height - 48,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accent.withValues(alpha: .1),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Semantics(
-                              liveRegion: true,
-                              child: Text(
-                                title,
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(
-                                      color: accent,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                              ),
+                      alignment: Alignment.center,
+                      child: Icon(_uploadIcon(c), color: accent, size: 21),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: accent,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              c.fileName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: colors.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: AppStrings.t('parity.close'),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => close(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                  if (c.phase == UploadPhase.uploading) ...[
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: c.progress,
-                        minHeight: 5,
-                        color: accent,
-                        backgroundColor: accent.withValues(alpha: .12),
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      c.total > 0
-                          ? '${((c.progress ?? 0) * 100).round()}% · ${_formatUploadBytes(c.sent)} / ${_formatUploadBytes(c.total)}'
-                          : AppStrings.t('uploadTray.connecting'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ] else if (c.phase == UploadPhase.processing) ...[
-                    const SizedBox(height: 9),
-                    Text(
-                      AppStrings.t('uploadTray.processingHint'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                  if (c.error != null) ...[
-                    const SizedBox(height: 9),
-                    Text(
-                      c.error!,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.error,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (c.busy)
-                        TextButton.icon(
-                          onPressed: c.cancel,
-                          icon: const Icon(
-                            Icons.stop_circle_outlined,
-                            size: 18,
                           ),
-                          label: Text(AppStrings.t('parity.cancel')),
-                        )
-                      else if (!done) ...[
-                        TextButton(
-                          onPressed: () => close(dismissUpload: true),
-                          child: Text(AppStrings.t('parity.close')),
-                        ),
-                        const SizedBox(width: 4),
-                        FilledButton.icon(
-                          onPressed: c.retry,
-                          icon: const Icon(Icons.refresh_rounded, size: 18),
-                          label: Text(AppStrings.t('parity.retry')),
-                        ),
-                      ] else
-                        FilledButton(
-                          onPressed: () => close(dismissUpload: true),
-                          child: Text(AppStrings.t('parity.close')),
-                        ),
-                    ],
+                          const SizedBox(height: 3),
+                          Text(
+                            c.fileName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: AppStrings.t('parity.close'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => close(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (c.phase == UploadPhase.uploading) ...[
+                          const SizedBox(height: 16),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: c.progress,
+                              minHeight: 5,
+                              color: accent,
+                              backgroundColor: accent.withValues(alpha: .12),
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            c.total > 0
+                                ? '${((c.progress ?? 0) * 100).round()}% · ${_formatUploadBytes(c.sent)} / ${_formatUploadBytes(c.total)}'
+                                : AppStrings.t('uploadTray.connecting'),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.onSurfaceVariant),
+                          ),
+                        ] else if (c.phase == UploadPhase.processing) ...[
+                          const SizedBox(height: 9),
+                          Text(
+                            AppStrings.t('uploadTray.processingHint'),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.onSurfaceVariant),
+                          ),
+                        ],
+                        if (c.error != null) ...[
+                          const SizedBox(height: 9),
+                          Text(
+                            c.error!,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.error, height: 1.35),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (c.busy)
+                      TextButton.icon(
+                        onPressed: c.cancel,
+                        icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                        label: Text(AppStrings.t('parity.cancel')),
+                      )
+                    else if (!done) ...[
+                      TextButton(
+                        onPressed: () => close(dismissUpload: true),
+                        child: Text(AppStrings.t('parity.close')),
+                      ),
+                      const SizedBox(width: 4),
+                      FilledButton.icon(
+                        onPressed: c.retry,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: Text(AppStrings.t('parity.retry')),
+                      ),
+                    ] else
+                      FilledButton(
+                        onPressed: () => close(dismissUpload: true),
+                        child: Text(AppStrings.t('parity.close')),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
