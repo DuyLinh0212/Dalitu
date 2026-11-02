@@ -301,3 +301,25 @@ def test_ready_distinguishes_missing_token_from_loading_model(tmp_path) -> None:
     assert response.status_code == 503
     assert response.json()["detail"]["retryable"] is False
     assert response.json()["detail"]["message"] == "RECOMMENDER_SERVICE_TOKEN is not configured."
+
+
+@pytest.mark.parametrize(
+    "loaded,configured", [(False, False), (False, True), (True, False), (True, True)]
+)
+def test_B_PYAPI_02_readiness_retryability_matches_recoverable_state(tmp_path, loaded, configured):
+    client = _client(tmp_path)
+    client.app.state.registry.refresh = lambda: None
+    if not loaded:
+        client.app.state.registry.loaded = None
+        client.app.state.registry.load_error = "Recommendation model is loading."
+    client.app.state.settings.recommender_service_token = "test-token" if configured else ""
+    with client:
+        response = client.get("/ready")
+    if loaded and configured:
+        assert response.status_code == 200
+        assert response.json()["status"] == "ready"
+    else:
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "SERVICE_NOT_READY"
+        assert response.json()["detail"]["retryable"] is configured
+    assert "test-token" not in response.text

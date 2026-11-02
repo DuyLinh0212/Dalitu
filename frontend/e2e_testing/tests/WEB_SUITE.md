@@ -55,7 +55,10 @@ Excel dùng 10 cột của sheet E2E trong mẫu, tách Summary/User/Admin. Loca
 `coverage/export_web_report.mjs` dùng bundled artifact-tool và render QA.
 CI không có bundled runtime: cài openpyxl 3.1.5 rồi chạy
 `python frontend/e2e_testing/coverage/export_ci_report.py`.
-CI export/upload JSON/XLSX/screenshot kể cả khi test fail.
+CI tạo thêm `artifacts/runs/<run-id>/playwright-report.html` cho lượt Web và RBAC.
+Tải artifact `hutube-e2e-evidence-*` trong trang Actions để xem báo cáo HTML cùng
+ảnh minh chứng. Báo cáo cho phép lọc ca theo mã/tên, ứng dụng và trạng thái.
+CI export/upload JSON/XLSX/HTML/screenshot kể cả khi test fail.
 
 ## Chưa hoàn tất toàn bộ scenario
 

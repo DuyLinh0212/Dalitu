@@ -325,6 +325,11 @@ jobs:
       - name: Verify Web result and screenshot consistency
         if: ${{ !cancelled() && steps.e2e_setup.outcome == 'success' }}
         run: python frontend/e2e_testing/coverage/verify_web_evidence.py
+      - name: Export Playwright HTML reports
+        if: ${{ !cancelled() && steps.e2e_setup.outcome == 'success' }}
+        run: >-
+          python frontend/e2e_testing/coverage/export_html_report.py
+          --latest web --latest rbac
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -332,6 +337,7 @@ jobs:
           path: |
             frontend/e2e_testing/artifacts/runs/*/*report.json
             frontend/e2e_testing/artifacts/runs/*/*.xlsx
+            frontend/e2e_testing/artifacts/runs/*/playwright-report.html
             frontend/e2e_testing/artifacts/runs/*/downloads/*.csv
             frontend/e2e_testing/artifacts/web-latest.json
             frontend/e2e_testing/artifacts/rbac-latest.json

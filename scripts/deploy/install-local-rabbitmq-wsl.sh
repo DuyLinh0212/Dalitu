@@ -43,6 +43,8 @@ fi
 rabbitmqctl add_vhost dalitu >/dev/null
 if ! rabbitmqctl list_users -q | cut -f1 | grep -Fxq "$RABBITMQ_USER"; then
     rabbitmqctl add_user "$RABBITMQ_USER" "$RABBITMQ_PASSWORD" >/dev/null
+else
+    rabbitmqctl change_password "$RABBITMQ_USER" "$RABBITMQ_PASSWORD" >/dev/null
 fi
 rabbitmqctl set_user_tags "$RABBITMQ_USER" administrator >/dev/null
 rabbitmqctl set_permissions -p dalitu "$RABBITMQ_USER" '.*' '.*' '.*' >/dev/null

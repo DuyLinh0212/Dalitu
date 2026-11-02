@@ -22,6 +22,44 @@ namespace HuTube.IntegrationTests;
 public sealed class ModerationMessagingIntegrationTests(AuthApiFactory factory) : IClassFixture<AuthApiFactory>
 {
     private sealed record Fixture(User Owner, User Reviewer, Channel Channel, Video Video, ModerationCase Case, List<User> Viewers);
+
+    private static string? ReadLocalMessagingValue(string key)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var environmentFile = Path.Combine(directory.FullName, ".env.messaging.local");
+            if (!File.Exists(environmentFile)) continue;
+
+            foreach (var line in File.ReadLines(environmentFile))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+
+                var separator = trimmed.IndexOf('=');
+                if (separator < 0 || !string.Equals(trimmed[..separator].Trim(), key, StringComparison.Ordinal)) continue;
+
+                var value = trimmed[(separator + 1)..].Trim();
+                if (value.Length >= 2 &&
+                    ((value.StartsWith('"') && value.EndsWith('"')) || (value.StartsWith('\'') && value.EndsWith('\''))))
+                    value = value[1..^1];
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetRabbitMqPassword()
+    {
+        var password = Environment.GetEnvironmentVariable("TEST_RABBITMQ_PASSWORD");
+        if (!string.IsNullOrWhiteSpace(password)) return password;
+
+        password = ReadLocalMessagingValue("RabbitMq__Password");
+        return !string.IsNullOrWhiteSpace(password)
+            ? password
+            : throw new InvalidOperationException("Set TEST_RABBITMQ_PASSWORD or configure RabbitMq__Password in .env.messaging.local for real broker integration tests.");
+    }
+
     private sealed class Clock : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = DateTimeOffset.UtcNow;
@@ -190,11 +228,12 @@ public sealed class ModerationMessagingIntegrationTests(AuthApiFactory factory) 
     [Fact]
     public async Task RabbitMqConfirmedPublish_RealConsumerAndRedeliveryProduceOneInboxPerRecipient()
     {
-        var password = Environment.GetEnvironmentVariable("TEST_RABBITMQ_PASSWORD")
-            ?? throw new InvalidOperationException("TEST_RABBITMQ_PASSWORD is required for real broker integration tests.");
+        var password = GetRabbitMqPassword();
         var suffix = Guid.NewGuid().ToString("N");
+        var host = Environment.GetEnvironmentVariable("TEST_RABBITMQ_HOST");
+        if (string.IsNullOrWhiteSpace(host)) host = ReadLocalMessagingValue("RabbitMq__HostName");
         var options = new RabbitMqOptions { Enabled = true, Password = password,
-            HostName = Environment.GetEnvironmentVariable("TEST_RABBITMQ_HOST") ?? "127.0.0.1",
+            HostName = string.IsNullOrWhiteSpace(host) ? "127.0.0.1" : host,
             Exchange = "dalitu.test." + suffix, Queue = "dalitu.test." + suffix, FanoutBatchSize = 2 };
         await using var transport = new RabbitMqTransport(options);
         await using var connection = await transport.CreateFactory().CreateConnectionAsync();

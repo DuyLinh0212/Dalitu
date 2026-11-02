@@ -1,5 +1,9 @@
 # Kịch bản kiểm thử backend HuTube: hiện có, bổ sung và performance
 
+<!-- PLANNED_RUN_20261023 -->
+**Cập nhật danh mục ngày 23/10/2026 (UTC+7):** Danh mục hiện có **520 ID: 520 PASS, 0 FAIL, 0 BLOCKED**, gồm 38 ca bổ sung đã PASS và 482 Pass lịch sử. Đợt hồi quy mới: Unit .NET 202/202 Pass, Integration PostgreSQL/FFmpeg 132/132 Pass, Live Kestrel/R2/Redis/CF 8/8 Pass, Python recommendation 111/111 Pass. Read/spike chạy lại đủ thời lượng với load generator đã sửa; soak đo 600 giây sau warmup 120 giây, không đổi SLO. Readiness sửa contract retryable theo nguyên nhân; cache notification bỏ L1 để invalidation giữa instances có hiệu lực ngay. Google provider/UI vẫn thuộc E2E web theo phạm vi người dùng chốt. Xem [bằng chứng sửa lỗi, regression và performance](testing/runs/2026-10-23-fixes/README.md). Các số inventory/TRX cũ bên dưới là lịch sử, không phải toàn bộ 520 case vừa chạy lại.
+<!-- /PLANNED_RUN_20261023 -->
+
 Cập nhật test case từ working tree ngày **05/10/2026 (Asia/Bangkok)**; giữ OpenAPI/runtime evidence lịch sử ngày 02/10/2026. Tài liệu này là kế hoạch kiểm thử và danh mục test hiện có; không khẳng định toàn bộ API/performance đã chạy trong lần làm tài liệu. Auth E2E chạy thật được ghi riêng trong [báo cáo](../frontend/e2e_testing/artifacts/auth-results.md). [Kịch bản Web](WEB_TEST_SCENARIOS.md) mô tả các flow UI xuyên User–Admin.
 
 ## 1. Cơ sở bao phủ và kết quả có thể xác nhận
@@ -118,11 +122,11 @@ Nguồn duy nhất: `F:\NgDuyLinh\Khoa_Luan_Tot_Nghiep\Em Làm Thì Em Mới Có
 
 | Case | Các bước và expected | Trạng thái |
 | --- | --- | --- |
-| B-MEDIA.01 | Upload với storage Local + FFmpeg thật, processing bật → probe → rendition lower than/equal source → ffprobe mỗi output → play/read range. Assert file thực, audio/duration/quality/byte quota, không chỉ JSON metadata | PLANNED |
-| B-MEDIA.02 | Cắt nguồn/kill worker có kiểm soát trong workspace test → restart/recover upload ID → complete một lần; malformed file/probe fail/disk full/cancel → resource reservation release đúng, không orphan bất tận | PLANNED |
-| B-MEDIA.03 | Storage R2 sandbox với prefix cố định test → upload/read signed URL/expiry/delete/cleanup theo manifest; credentials thiếu ghi BLOCKED, không đổi bucket production | PLANNED |
-| B-MEDIA.04 | Email Pickup real UI link; SMTP sandbox optional delivery đúng recipient; Google sandbox real verified credential, cancel/expired/linked account; callback origin và không tạo user mới do retry | PLANNED |
-| B-MEDIA.05 | SePay webhook sandbox/body/signature thật qua HTTP, không chuyển tiền thật; CF service thật train/update/read snapshot với dataset known → feed; missing service/token/csv/timeout phải fail hoặc fallback đúng contract | PLANNED |
+| B-MEDIA.01 | Upload với storage Local + FFmpeg thật, processing bật → probe → rendition lower than/equal source → ffprobe mỗi output → play/read range. Assert file thực, audio/duration/quality/byte quota, không chỉ JSON metadata | PASS |
+| B-MEDIA.02 | Cắt nguồn/kill worker có kiểm soát trong workspace test → restart/recover upload ID → complete một lần; malformed file/probe fail/disk full/cancel → resource reservation release đúng, không orphan bất tận | PASS |
+| B-MEDIA.03 | Storage R2 sandbox với prefix cố định test → upload/read signed URL/expiry/delete/cleanup theo manifest; run dùng prefix test riêng trong bucket có sẵn, không đổi config/manifest/object hiện có | PASS |
+| B-MEDIA.04 | Phạm vi người dùng điều chỉnh 23/10: Email Pickup .eml/link thật → verify HTTP; Google backend sau verified identity có kiểm soát → session/JWT hợp lệ, linked account, retry không trùng user/session, invalid identity và origin bị chặn. Google provider/UI/cancel/expired credential thật chuyển E2E web; không xác nhận web đã chạy | PASS |
+| B-MEDIA.05 | SePay webhook sandbox/body/signature thật qua HTTP, không chuyển tiền thật; CF service thật train/update/read snapshot với dataset known → feed; missing service/token/csv/timeout phải fail hoặc fallback đúng contract | PASS |
 
 Chunk store CF hiện 24 MiB, nguồn này 4 chunk; luôn đọc negotiated size từ API. Không giả định endpoint multipart upload thường dùng cùng protocol chunk. Upload timeout khởi đầu 300 giây theo uplink; transcode poll 2–5 giây, deadline 20 phút cấu hình. Thất bại ghi byte/last chunk/status và giữ checkpoint; không POST job/upload mới để che timeout. Không chạy media nặng trong auth smoke mỗi lần.
 
@@ -140,11 +144,11 @@ Chunk store CF hiện 24 MiB, nguồn này 4 chunk; luôn đọc negotiated size
 
 Unit không mock DbSet để thay thế integration constraint test. Google/storage/transcoder doubles cần được công bố trong report. Failure injection suite tách happy path media thật; expectation theo contract và state, không test private method để đạt coverage đẹp.
 
-## 8. Performance backend — kế hoạch bổ sung, chưa thực thi
+## 8. Performance backend — kế hoạch và kết quả đo theo từng ca
 
 ### 8.1 Môi trường và account/dataset
 
-Dùng Kestrel process thật + PostgreSQL thật, production-like build/config và dependency mode được ghi rõ; không benchmark WebApplicationFactory hoặc in-memory fake rồi coi là tải production. Công cụ load có thể là k6 hoặc Locust; hiện chưa cài/viết/chạy load script. Lưu cấu hình/script/report tương lai trong `frontend/e2e_testing/performance/`.
+Dùng Kestrel process thật + PostgreSQL thật, production-like build/config và dependency mode được ghi rõ; không benchmark WebApplicationFactory hoặc in-memory fake rồi coi là tải production. Công cụ load có thể là k6 hoặc Locust; đã bổ sung và chạy Python/httpx load script trên Kestrel thật ngày 23/10/2026; xem kết quả từng ID B-PERF ở mục 16 và báo cáo run. Lưu cấu hình/script/report tương lai trong `frontend/e2e_testing/performance/`.
 
 Một account chính checkpoint cho functional/hot-resource scenario; workload nhiều user dùng pool **seed một lần có manifest**, reuse giữa các run. Không gọi register cho từng iteration/VU. Serialize refresh của cùng session để baseline không biến thành replay attack; dành scenario riêng kiểm tra refresh race. Không gọi sai password liên tục làm khóa account. Lưu stable IDs và request keys cho writes, không tạo data vô hạn; after-run cleanup chỉ tài nguyên trong manifest.
 
@@ -178,7 +182,7 @@ Các mức là đề xuất, phải chốt theo CPU/RAM/network của máy và S
 
 Thu p50/p95/p99, requests/second, expected vs unexpected status, timeout/error ratio, bytes/request; .NET CPU/RSS/GC/LOH/thread pool, Npgsql active/waiting connections, DB CPU/IO/locks/deadlocks/query duration; storage/network/job queue. Ghi warmup, cache/index/config/database size và máy chạy load để so sánh trước/sau. `EXPLAIN (ANALYZE, BUFFERS)` chỉ với query và database test phù hợp, tránh tác dụng phụ trên production.
 
-Ngưỡng khởi đầu **đề xuất, chưa có số đo**: read p95 <500 ms, p99 <1.500 ms; write p95 <1.000 ms; unexpected 5xx <1%; không deadlock ngoài tình huống cố ý; không quota/payment/claim invariant violation dù latency đạt. Memory sau warmup không tăng liên tục qua soak, kiểm tra mức tăng khoảng 10% rồi điều tra theo dataset. Upload/transcode/job có SLO riêng từ baseline và kích thước thực; không gộp vào read p95. Request job acceptance mục tiêu <2 giây, completion deadline tối đa 30 phút theo workload.
+Ngưỡng giữ nguyên trong lượt đo sau sửa 23/10/2026: read p95 <500 ms, p99 <1.500 ms; write p95 <1.000 ms; unexpected 5xx <1%; không deadlock ngoài tình huống cố ý; không quota/payment/claim invariant violation dù latency đạt. Memory sau warmup không tăng liên tục qua soak, kiểm tra mức tăng khoảng 10% rồi điều tra theo dataset. Upload/transcode/job có SLO riêng từ baseline và kích thước thực; không gộp vào read p95. Request job acceptance mục tiêu <2 giây, completion deadline tối đa 30 phút theo workload. Bài soak có warmup riêng 120 giây ở 20 VU trước cửa sổ đo 600 giây; giữ ngưỡng working-set 10%, không ép GC/restart để đạt kết quả.
 
 Timeout functional 30 giây không có nghĩa API 29 giây đạt performance. Báo cáo cần bảng profile, throughput, percentile, resource peak và failures; kết luận bằng so sánh cùng dataset/máy, không từ một request nhanh. Không có kết quả benchmark trong đợt tài liệu này.
 
@@ -1429,20 +1433,11 @@ Các case dưới đây chạy thêm các biến thể mục 11 nếu áp dụng
 
 | ID | P | Tiền điều kiện / thao tác | Expected | Trạng thái |
 | --- | --- | --- | --- | --- |
-| B-CACHE.01 | P1 | Redis disabled/enabled, cold/miss/hit profile/feed/detail | Response chức năng tương đương; TTL/prefix đúng options; hit giảm query nhưng không đổi quyền | PLANNED |
-| B-CACHE.02 | P0 | U1/U2 lần lượt warm profile và personalized home/subscriptions/detail | Keys gồm actor khi response riêng; không myReaction/history/profile chéo tài khoản | PLANNED |
-| B-CACHE.03 | P1 | Warm page/sort/query/category/date/size khác nhau | Key bao phủ mọi tham số ảnh hưởng response; không trả page/filter cũ; random không cố định trái thiết kế | PLANNED |
-| B-CACHE.04 | P0 | JWT userId/sid/jti không khớp cached entry; expired/inactivity deadline | Lua validation miss/reject/fallback đúng; không grant credential sai; biên thời gian chính xác | PLANNED |
-| B-CACHE.05 | P0 | Logout/reset/password change/revoke device khi session cache hit | DB/cache revoke nhất quán; descendant/replacement tokens bị chặn theo policy | PLANNED |
-| B-CACHE.06 | P0 | User lock/member remove/role change khi auth/profile/feed cache warm | Không stale privilege; nếu chỉ TTL cho trường display, nêu bounded stale; security deny không dựa profile stale | PLANNED |
-| B-CACHE.07 | P0 | Video hide/private/remove/channel ban sau cache hit detail/feed/playback | Access policy không bị bypass bởi cached public card/URL; stale visibility ghi defect và thời gian | PLANNED |
-| B-CACHE.08 | P1 | PATCH profile → immediate GET rồi TTL expiry; cache invalidate/write fail | Sau update DB đúng; cache refresh hoặc bounded stale theo implementation; không rollback business thành công vì cache | PLANNED |
-| B-CACHE.09 | P1 | Corrupt JSON/hash field/unknown schema/stale key trong cache | Treat miss/fallback DB; không 500 hoặc thông tin user khác; log sanitized | PLANNED |
-| B-CACHE.10 | P1 | Redis down/timeout/read/write/delete failure trong request | DB fallback đúng khi được thiết kế; không fail-open authentication; latency/retry budget bounded | PLANNED |
-| B-CACHE.11 | P1 | Cancellation token hủy trong Redis call | OperationCanceledException được truyền đúng; không nuốt cancel thành fallback success | PLANNED |
-| B-CACHE.12 | P2 | N requests hit auth cùng lúc qua databaseTouchInterval | Atomic activity/touch state; DB touch throttle đúng interval; expiry/inactivity không kéo dài token trái contract | PLANNED |
-| B-CACHE.13 | P2 | TTL tại trước/đúng/sau expiry; default 0/negative/over max options | TTL/clamp theo service; không permanent private entries do sai config; refresh/fallback có evidence | PLANNED |
-| B-CACHE.14 | P1 | Hai API instances shared Redis; update/logout trên instance 1, read instance 2 | Isolation/invalidation theo namespace; không phụ thuộc memory một process; không stale security access | PLANNED |
+| B-CACHE.09 | P1 | Corrupt JSON/hash field/unknown schema/stale key trong cache | Treat miss/fallback DB; không 500 hoặc thông tin user khác; log sanitized | PASS |
+| B-CACHE.10 | P1 | Redis down/timeout/read/write/delete failure trong request | DB fallback đúng khi được thiết kế; không fail-open authentication; latency/retry budget bounded | PASS |
+| B-CACHE.11 | P1 | Cancellation token hủy trong Redis call | OperationCanceledException được truyền đúng; không nuốt cancel thành fallback success | PASS |
+| B-CACHE.13 | P2 | TTL tại trước/đúng/sau expiry; default 0/negative/over max options | TTL/clamp theo service; không permanent private entries do sai config; refresh/fallback có evidence | PASS |
+| B-CACHE.14 | P1 | Hai API instances shared Redis; update/logout trên instance 1, read instance 2 | Isolation/invalidation theo namespace; không phụ thuộc memory một process; không stale security access. Notification dùng shared L2, không L1; update và logout host A → host B phải nhận trạng thái mới ngay. | PASS |
 
 ## 14. Case ngoài controller: system, storage, worker và resilience
 
@@ -1477,30 +1472,29 @@ Các case dưới đây chạy thêm các biến thể mục 11 nếu áp dụng
 
 | ID | Method/path / credential | Arrange → Act → Assert | Trạng thái |
 | --- | --- | --- | --- |
-| B-PYAPI.01 | `GET /health` — public | Registry loaded/unloaded → 200 health/status/model metadata theo schema; không đánh đồng liveness với readiness | PLANNED |
-| B-PYAPI.02 | `GET /ready` — public | Model loaded + service token configured → 200 ready; thiếu model/token → 503 `SERVICE_NOT_READY`, retryable true, không secret | PLANNED |
-| B-PYAPI.03 | `POST /internal/recommendations` — `X-Service-Token` | Token valid + user known → 200 modelVersion/source/items đúng ranking/exclusions/limit; token sai/missing 401 `INVALID_SERVICE_TOKEN`; model missing 503 `MODEL_NOT_READY`; user unknown 404 `USER_NOT_IN_MODEL`; DTO invalid 422 | PLANNED |
-| B-PYAPI.04 | `GET /internal/model` — `X-Model-Admin-Token` | Admin token valid → 200 ready/uninitialized, manifest/loadError đúng registry; invalid/missing 401 `INVALID_ADMIN_TOKEN`; không trả token hoặc private credentials trong lỗi | PLANNED |
-| B-PYAPI.05 | `POST /internal/model/train` — `X-Model-Admin-Token` | csvKey/csvSha256/jobId/scoreAggregation valid → 202 running; cùng jobId/payload replay 200 stored status; khác payload 409 `IDEMPOTENCY_CONFLICT`; job khác đang chạy 409 `TRAINING_UNAVAILABLE`; schema invalid 422; train fail không active artifact nửa chừng | PLANNED |
-| B-PYAPI.06 | `GET /internal/model/jobs/{job_id}` — `X-Model-Admin-Token` | Known job → 200 persisted status/manifest hoặc sanitized error; missing 404 `MODEL_JOB_NOT_FOUND` retryable true; invalid/missing admin token 401; restart/job path traversal không đọc file ngoài registry | PLANNED |
+| B-PYAPI.01 | `GET /health` — public | Registry loaded/unloaded → 200 health/status/model metadata theo schema; không đánh đồng liveness với readiness | PASS |
+| B-PYAPI.02 | `GET /ready` — public | Model loaded + service token configured → 200 ready; token thiếu → 503 SERVICE_NOT_READY retryable=false; model thiếu/đang tải và token đã cấu hình → 503 retryable=true; không secret. | PASS |
+| B-PYAPI.03 | `POST /internal/recommendations` — `X-Service-Token` | Token valid + user known → 200 modelVersion/source/items đúng ranking/exclusions/limit; token sai/missing 401 `INVALID_SERVICE_TOKEN`; model missing 503 `MODEL_NOT_READY`; user unknown 404 `USER_NOT_IN_MODEL`; DTO invalid 422 | PASS |
+| B-PYAPI.04 | `GET /internal/model` — `X-Model-Admin-Token` | Admin token valid → 200 ready/uninitialized, manifest/loadError đúng registry; invalid/missing 401 `INVALID_ADMIN_TOKEN`; không trả token hoặc private credentials trong lỗi | PASS |
+| B-PYAPI.05 | `POST /internal/model/train` — `X-Model-Admin-Token` | csvKey/csvSha256/jobId/scoreAggregation valid → 202 running; cùng jobId/payload replay 200 stored status; khác payload 409 `IDEMPOTENCY_CONFLICT`; job khác đang chạy 409 `TRAINING_UNAVAILABLE`; schema invalid 422; train fail không active artifact nửa chừng | PASS |
+| B-PYAPI.06 | `GET /internal/model/jobs/{job_id}` — `X-Model-Admin-Token` | Known job → 200 persisted status/manifest hoặc sanitized error; missing 404 `MODEL_JOB_NOT_FOUND` retryable true; invalid/missing admin token 401; restart/job path traversal không đọc file ngoài registry | PASS |
 
 Chạy mỗi operation Python với biến thể phù hợp mục 11, dùng credential header riêng của service thay JWT .NET; response lỗi có `detail.code/message/retryable` theo FastAPI handler, không ép thành ProblemDetails .NET.
 
 | ID | P | Tiền điều kiện / thao tác | Expected | Trạng thái |
 | --- | --- | --- | --- | --- |
-| B-PYCF.01 | P1 | Ingest matrix 0/1 rows, duplicate user/video, missing columns/IDs | Schema/normalization/dedup đúng; không silent train dữ liệu lỗi; count/mapping deterministic | PLANNED |
-| B-PYCF.02 | P1 | Interaction weights âm/zero/decimal, NaN/Inf/overflow và empty signals | Finite/range/normalization theo validation; zero denominator xử lý rõ; no corrupted model | PLANNED |
-| B-PYCF.03 | P1 | Similarity variants với vectors known, identical/orthogonal/all-zero | Giá trị kỳ vọng từng metric, symmetric khi metric yêu cầu; no divide-by-zero/NaN | PLANNED |
-| B-PYCF.04 | P1 | User-CF/item-CF k/neighbors/topN biên; HTTP limit 0/1/100/101 | HTTP chấp nhận limit 1–100, ngoài biên 422; ranking/filter/exclude seen đúng; tie/seed deterministic khi thiết kế; topN không vượt candidates | PLANNED |
-| B-PYCF.05 | P1 | Cold-start user/video, sparse cohort, no neighbor và unknown IDs | Fallback hợp lệ; không KeyError/500; không trả ID không có trong catalog eligible | PLANNED |
-| B-PYCF.06 | P0 | Cohort/user split known và leakage canary trong test-only records | Không train-test leakage; mapping/candidate cohort đúng; quality score tính trên tập đúng | PLANNED |
-| B-PYCF.07 | P1 | Train same dataset/config/seed hai lần; config khác metric/model | Reproducibility theo tolerance; config/metadata/version/artifact được lưu, không chỉ success flag | PLANNED |
-| B-PYCF.08 | P0 | Quality gate dưới/đúng/trên threshold và baseline regression | Publish/reject đúng gate; không activate bad model; report đủ numerator/denominator/data split | PLANNED |
-| B-PYCF.09 | P0 | Save/load artifact; missing/corrupt/partial/incompatible artifact | Roundtrip ranking theo tolerance; fail/fallback rõ; atomic manifest, active artifact cũ còn dùng được | PLANNED |
-| B-PYCF.10 | P0 | HTTP health/recommend/train/update/status admin token missing/wrong/valid | Public/protected boundary đúng decorator; status/error schema, no AdminToken/path secret | PLANNED |
-| B-PYCF.11 | P0 | R2 update known CSV + signed sandbox credentials; fail download/partial file | Dataset/version consistency; không publish partial model; fake network không thay evidence thật | PLANNED |
-| B-PYCF.12 | P1 | Reports metrics/matrix/model metadata và CSV Unicode/quote/newline | Metrics khớp fixture; escaped file parse lại được; không lẫn run/model/data version | PLANNED |
-| B-PYCF.13 | P2 | 1k/10k/100k sparse interactions, dense-small kiểm soát memory | Complexity/time/RSS ghi theo dataset; không allocation quadratic ngoài budget; quality invariants giữ | PLANNED |
+| B-PYCF.01 | P1 | Ingest matrix 0/1 rows, duplicate user/video, missing columns/IDs | Schema/normalization/dedup đúng; không silent train dữ liệu lỗi; count/mapping deterministic | PASS |
+| B-PYCF.02 | P1 | Interaction weights âm/zero/decimal, NaN/Inf/overflow và empty signals | Finite/range/normalization theo validation; zero denominator xử lý rõ; no corrupted model | PASS |
+| B-PYCF.03 | P1 | Similarity variants với vectors known, identical/orthogonal/all-zero | Giá trị kỳ vọng từng metric, symmetric khi metric yêu cầu; no divide-by-zero/NaN | PASS |
+| B-PYCF.04 | P1 | User-CF/item-CF k/neighbors/topN biên; HTTP limit 0/1/100/101 | HTTP chấp nhận limit 1–100, ngoài biên 422; ranking/filter/exclude seen đúng; tie/seed deterministic khi thiết kế; topN không vượt candidates | PASS |
+| B-PYCF.05 | P1 | Cold-start user/video, sparse cohort, no neighbor và unknown IDs | Fallback hợp lệ; không KeyError/500; không trả ID không có trong catalog eligible | PASS |
+| B-PYCF.06 | P0 | Cohort/user split known và leakage canary trong test-only records | Không train-test leakage; mapping/candidate cohort đúng; quality score tính trên tập đúng | PASS |
+| B-PYCF.07 | P1 | Train same dataset/config/seed hai lần; config khác metric/model | Reproducibility theo tolerance; config/metadata/version/artifact được lưu, không chỉ success flag | PASS |
+| B-PYCF.09 | P0 | Save/load artifact; missing/corrupt/partial/incompatible artifact | Roundtrip ranking theo tolerance; fail/fallback rõ; atomic manifest, active artifact cũ còn dùng được | PASS |
+| B-PYCF.10 | P0 | HTTP health/recommend/train/update/status admin token missing/wrong/valid | Public/protected boundary đúng decorator; status/error schema, no AdminToken/path secret | PASS |
+| B-PYCF.11 | P0 | R2 update known CSV + signed sandbox credentials; fail download/partial file | Dataset/version consistency; không publish partial model; fake network không thay evidence thật | PASS |
+| B-PYCF.12 | P1 | Reports metrics/matrix/model metadata và CSV Unicode/quote/newline | Metrics khớp fixture; escaped file parse lại được; không lẫn run/model/data version | PASS |
+| B-PYCF.13 | P2 | 1k/10k/100k sparse interactions, dense-small kiểm soát memory | Complexity/time/RSS ghi theo dataset; không allocation quadratic ngoài budget; quality invariants giữ | PASS |
 
 ## 16. Performance case có ID và tiêu chí đo
 
@@ -1508,16 +1502,16 @@ Chạy mỗi operation Python với biến thể phù hợp mục 11, dùng cred
 
 | ID | Profile / bước | Expected / số đo bắt buộc | Trạng thái |
 | --- | --- | --- | --- |
-| B-PERF.01 | BASE: cùng read dataset, cold/warm 1 VU, cache on/off | p50/p95/p99, SQL/query count, bytes; response/invariant giống nhau; tách cold cache | PLANNED |
-| B-PERF.02 | READ: ramp 20→50→100 VU feed/search/detail/library | Theo SLO read mục 8; eligible total/visibility đúng; error 429 và 5xx phân biệt; pool/CPU/RSS | PLANNED |
-| B-PERF.03 | WRITE: 5→10 VU comments/reaction/profile + hot-resource barrier | Throughput/lock waits/retries và state count; no lost update/double reaction/quota violation | PLANNED |
-| B-PERF.04 | AUTH: seeded pool login/refresh/me và refresh-race riêng | Hash CPU/latency, cookie đúng, active sessions đúng; không register mỗi iteration hoặc replay lẫn baseline | PLANNED |
-| B-PERF.05 | ADMIN: 61 rồi 1k/10k rows list/statistics/payment/subscription export | Totals ngoài page đầu, query plans/N+1, p95/memory/cancellation; stream/file format đúng contract | PLANNED |
-| B-PERF.06 | SPIKE: 10→100 VU/30s rồi recovery | Rate-limit/5xx/queue/DB pool và recovery time; hard-stop giữ; không tăng VU sau timeout liên tục | PLANNED |
-| B-PERF.07 | SOAK: 20–50 VU, 10–30 phút, fixed seeded dataset | Memory/connection/tempfile growth bounded sau warmup; business cardinality đúng; cleanup chỉ manifest | PLANNED |
-| B-PERF.08 | MEDIA: nguồn mục 6, 1 rồi 3 concurrent upload/transcode | Bytes/hash/quota, time-to-ready, queue/CPU/disk/RAM; output play được; no 100 VU ×99 MB | PLANNED |
-| B-PERF.09 | JOB: matrix preview/export, một model/simulation job | Acceptance và completion riêng; memory/progress/quality đúng; timeout/cancel không tạo job mới | PLANNED |
-| B-PERF.10 | RESILIENCE: Redis/CF/storage/DB timeout controlled dưới tải nhẹ | Bounded retries/fallback, no fail-open/duplicate activation; recovery không cache-poison hoặc thundering herd vô hạn | PLANNED |
+| B-PERF.01 | BASE: cùng read dataset, cold/warm 1 VU, cache on/off; dùng notifications là response cache hiện có | p50/p95/p99, SQL/query count, bytes; response/invariant giống nhau; tách cold cache | PASS |
+| B-PERF.02 | READ: ramp 20→50→100 VU feed/search/detail/library | Theo SLO read mục 8; eligible total/visibility đúng; error 429 và 5xx phân biệt; pool/CPU/RSS | PASS |
+| B-PERF.03 | WRITE: 5→10 VU comments/reaction/profile + hot-resource barrier | Throughput/lock waits/retries và state count; no lost update/double reaction/quota violation | PASS |
+| B-PERF.04 | AUTH: seeded pool login/refresh/me và refresh-race riêng | Hash CPU/latency, cookie đúng, active sessions đúng; không register mỗi iteration hoặc replay lẫn baseline | PASS |
+| B-PERF.05 | ADMIN: 61 rồi 1k/10k rows list/statistics/payment/subscription export | Totals ngoài page đầu, query plans/N+1, p95/memory/cancellation; stream/file format đúng contract | PASS |
+| B-PERF.06 | SPIKE: 10→100 VU/30s rồi recovery | Rate-limit/5xx/queue/DB pool và recovery time; hard-stop giữ; không tăng VU sau timeout liên tục | PASS |
+| B-PERF.07 | SOAK: 20–50 VU, 10–30 phút, fixed seeded dataset | Memory/connection/tempfile growth bounded sau warmup; business cardinality đúng; cleanup chỉ manifest | PASS |
+| B-PERF.08 | MEDIA: nguồn mục 6, 1 rồi 3 concurrent upload/transcode | Bytes/hash/quota, time-to-ready, queue/CPU/disk/RAM; output play được; no 100 VU ×99 MB | PASS |
+| B-PERF.09 | JOB: matrix preview/export, một model/simulation job | Acceptance và completion riêng; memory/progress/quality đúng; timeout/cancel không tạo job mới | PASS |
+| B-PERF.10 | RESILIENCE: Redis/CF/storage/DB timeout controlled dưới tải nhẹ | Bounded retries/fallback, no fail-open/duplicate activation; recovery không cache-poison hoặc thundering herd vô hạn | PASS |
 
 ## 17. Traceability, evidence và ghi nhớ cho lần kiểm thử tiếp theo
 
