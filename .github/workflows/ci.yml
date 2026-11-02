@@ -170,7 +170,16 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze --fatal-infos
-      - run: flutter test
+      - name: Run mobile unit and widget tests with coverage
+        run: flutter test --coverage --reporter expanded
+      - name: Upload mobile coverage report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: mobile-flutter-coverage-${{ github.sha }}
+          path: mobile/user-app/coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 14
       - name: Validate mobile release configuration
         shell: bash
         run: |

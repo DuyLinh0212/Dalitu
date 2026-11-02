@@ -102,6 +102,13 @@ class _PlansScreenState extends State<PlansScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    if (!_loading || _error != null) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final plans = await _planService.catalogue();
       Map<String, dynamic>? myPlan;
@@ -131,6 +138,7 @@ class _PlansScreenState extends State<PlansScreen> {
         _myPlan = myPlan;
         _payments = payments;
         _loading = false;
+        _error = null;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _planController.hasClients) {
@@ -245,82 +253,16 @@ class _PlansScreenState extends State<PlansScreen> {
   }
 
   Future<void> _inviteMember() async {
-    final emailController = TextEditingController();
-    final quotaController = TextEditingController();
     final availableBytes = _unallocatedStorage(_myPlan ?? const {});
-    final maxGb = availableBytes / (1024 * 1024 * 1024);
-    final invitation = await showDialog<Map<String, dynamic>>(
+    final invitation = await showDialog<_PlanInviteDraft>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final quotaText = quotaController.text.trim();
-          final quotaGb = double.tryParse(quotaText);
-          final quotaError =
-              quotaText.isNotEmpty &&
-                  (quotaGb == null || quotaGb < 0 || quotaGb > maxGb)
-              ? AppStrings.format('plans.quotaExceedsAvailable', {
-                  'available': _formatBytes(availableBytes),
-                })
-              : null;
-          return AlertDialog(
-            title: Text(AppStrings.t('plans.inviteDialogTitle')),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: AppStrings.t('plans.inviteEmail'),
-                    hintText: AppStrings.t('plans.inviteEmailHint'),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: quotaController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                  ],
-                  decoration: InputDecoration(
-                    labelText: AppStrings.t('plans.memberStorageTitle'),
-                    hintText: AppStrings.t('plans.storageGBPlaceholder'),
-                    helperText: AppStrings.format('plans.inviteQuotaMax', {
-                      'size': _formatBytes(availableBytes),
-                    }),
-                    errorText: quotaError,
-                  ),
-                  onChanged: (_) => setDialogState(() {}),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(AppStrings.t('common.cancel')),
-              ),
-              FilledButton(
-                onPressed: quotaError != null
-                    ? null
-                    : () => Navigator.of(dialogContext).pop({
-                        'email': emailController.text,
-                        'allocatedStorage': quotaGb == null
-                            ? null
-                            : (quotaGb * 1024 * 1024 * 1024).round(),
-                      }),
-                child: Text(AppStrings.t('common.send')),
-              ),
-            ],
-          );
-        },
+      builder: (_) => _PlanInviteDialog(
+        availableBytes: availableBytes,
+        availableBytesLabel: _formatBytes(availableBytes),
       ),
     );
-    emailController.dispose();
-    quotaController.dispose();
-    final trimmed = '${invitation?['email'] ?? ''}'.trim();
+    if (invitation == null) return;
+    final trimmed = invitation.email.trim();
     if (trimmed.isEmpty) return;
     if (!trimmed.contains('@')) {
       if (mounted) {
@@ -331,8 +273,10 @@ class _PlansScreenState extends State<PlansScreen> {
       return;
     }
     try {
-      final allocatedStorage = invitation?['allocatedStorage'] as int?;
-      await _planService.invite(trimmed, allocatedStorage: allocatedStorage);
+      await _planService.invite(
+        trimmed,
+        allocatedStorage: invitation.allocatedStorage,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppStrings.t('plans.inviteSent'))),
@@ -977,6 +921,109 @@ class _PlansScreenState extends State<PlansScreen> {
       ),
     );
   }
+}
+
+class _PlanInviteDraft {
+  const _PlanInviteDraft({required this.email, required this.allocatedStorage});
+
+  final String email;
+  final int? allocatedStorage;
+}
+
+class _PlanInviteDialog extends StatefulWidget {
+  const _PlanInviteDialog({
+    required this.availableBytes,
+    required this.availableBytesLabel,
+  });
+
+  final int availableBytes;
+  final String availableBytesLabel;
+
+  @override
+  State<_PlanInviteDialog> createState() => _PlanInviteDialogState();
+}
+
+class _PlanInviteDialogState extends State<_PlanInviteDialog> {
+  final _emailController = TextEditingController();
+  final _quotaController = TextEditingController();
+
+  double get _maxGb => widget.availableBytes / (1024 * 1024 * 1024);
+  double? get _quotaGb => double.tryParse(_quotaController.text.trim());
+  String? get _quotaError {
+    final text = _quotaController.text.trim();
+    final value = _quotaGb;
+    if (text.isEmpty || (value != null && value >= 0 && value <= _maxGb)) {
+      return null;
+    }
+    return AppStrings.format('plans.quotaExceedsAvailable', {
+      'available': widget.availableBytesLabel,
+    });
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _quotaController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final quota = _quotaGb;
+    Navigator.of(context).pop(
+      _PlanInviteDraft(
+        email: _emailController.text,
+        allocatedStorage: quota == null
+            ? null
+            : (quota * 1024 * 1024 * 1024).round(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(AppStrings.t('plans.inviteDialogTitle')),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: AppStrings.t('plans.inviteEmail'),
+            hintText: AppStrings.t('plans.inviteEmailHint'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _quotaController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: InputDecoration(
+            labelText: AppStrings.t('plans.memberStorageTitle'),
+            hintText: AppStrings.t('plans.storageGBPlaceholder'),
+            helperText: AppStrings.format('plans.inviteQuotaMax', {
+              'size': widget.availableBytesLabel,
+            }),
+            errorText: _quotaError,
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: Text(AppStrings.t('common.cancel')),
+      ),
+      FilledButton(
+        onPressed: _quotaError == null ? _submit : null,
+        child: Text(AppStrings.t('common.send')),
+      ),
+    ],
+  );
 }
 
 class _PlanCard extends StatelessWidget {

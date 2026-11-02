@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:user_app/auth.dart';
 import 'package:user_app/features/payments/payment_service.dart';
@@ -35,6 +36,24 @@ void main() {
           {},
           (a) async {
             await PaymentService(a).cancelPayment('payment-1');
+          },
+        ),
+        (
+          'payment history decodes list responses',
+          'GET',
+          '/payments',
+          null,
+          (a) async {
+            await PaymentService(a).mine();
+          },
+        ),
+        (
+          'payment lookup encodes the payment identifier',
+          'GET',
+          '/payments/payment%2Fone',
+          null,
+          (a) async {
+            await PaymentService(a).get('payment/one');
           },
         ),
         (
@@ -89,6 +108,33 @@ void main() {
           },
         ),
         (
+          'owner storage allocation can be updated',
+          'PATCH',
+          '/plans/my-subscription/owner-storage',
+          {'allocatedStorage': 2048},
+          (a) async {
+            await PlanService(a).updateOwnerStorage(2048);
+          },
+        ),
+        (
+          'shared plan member can be removed',
+          'DELETE',
+          '/plans/members/member-1',
+          null,
+          (a) async {
+            await PlanService(a).removeMember('member-1');
+          },
+        ),
+        (
+          'violation types load from the public catalogue',
+          'GET',
+          '/violation-types',
+          null,
+          (a) async {
+            await ModerationService(a).violationTypes();
+          },
+        ),
+        (
           'video report trims description',
           'POST',
           '/videos/video-1/report',
@@ -112,6 +158,81 @@ void main() {
               violationTypeId: 'spam',
               description: 'report',
             );
+          },
+        ),
+        (
+          'channel report trims description and encodes channel id',
+          'POST',
+          '/channels/channel%2F1/report',
+          {'violationTypeId': 'spam', 'description': 'details'},
+          (a) async {
+            await ModerationService(a).reportChannel(
+              channelId: 'channel/1',
+              violationTypeId: 'spam',
+              description: ' details ',
+            );
+          },
+        ),
+        (
+          'generic report uses the moderation report endpoint',
+          'POST',
+          '/reports',
+          {
+            'targetType': 'playlist',
+            'targetId': 'list-1',
+            'violationTypeId': 'spam',
+            'description': 'description',
+          },
+          (a) async {
+            await ModerationService(a).createReport(
+              targetType: 'playlist',
+              targetId: 'list-1',
+              violationTypeId: 'spam',
+              description: ' description ',
+            );
+          },
+        ),
+        (
+          'appeal history decodes list responses',
+          'GET',
+          '/appeals/my',
+          null,
+          (a) async {
+            await ModerationService(a).myAppeals();
+          },
+        ),
+        (
+          'appeal submission trims reason and evidence',
+          'POST',
+          '/appeals',
+          {
+            'targetType': 'video',
+            'targetId': 'video-1',
+            'reason': 'Reason',
+            'evidenceUrl': 'https://example.test/proof',
+            'evidenceNote': 'Evidence',
+            'moderationCaseId': 'case-1',
+            'strikeId': 'strike-1',
+          },
+          (a) async {
+            await ModerationService(a).createAppeal(
+              targetType: 'video',
+              targetId: 'video-1',
+              reason: ' Reason ',
+              evidenceUrl: ' https://example.test/proof ',
+              evidenceNote: ' Evidence ',
+              moderationCaseId: 'case-1',
+              strikeId: 'strike-1',
+            );
+          },
+        ),
+        (
+          'channel strikes use an encoded channel identifier',
+          'GET',
+          '/channels/channel%2F1/strikes',
+          null,
+          (a) async {
+            await ModerationService(a).channelStrikes('channel/1');
           },
         ),
         (
@@ -152,13 +273,27 @@ void main() {
             calls++;
             expect(request.method, scenario.$2);
             expect(request.url.path, '/api/v1${scenario.$3}');
-            expect(request.headers['Authorization'], startsWith('Bearer '));
+            final publicRequest =
+                scenario.$1 == 'violation types load from the public catalogue'
+                ? true
+                : false;
+            if (!publicRequest) {
+              expect(request.headers['Authorization'], startsWith('Bearer '));
+            }
             if (scenario.$4 != null) {
               expect(jsonDecode(request.body), scenario.$4);
             }
-            return fail
-                ? jsonResponse({'code': 'FAILED'}, 503)
-                : jsonResponse({});
+            if (fail) return jsonResponse({'code': 'FAILED'}, 503);
+            if (request.url.path.endsWith('/payments') ||
+                request.url.path.endsWith('/appeals/my') ||
+                request.url.path.endsWith('/violation-types')) {
+              return http.Response(
+                '[]',
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            return jsonResponse({});
           });
           final auth = AuthController(
             ApiClient(baseUrl: 'https://mobile.test/api/v1', client: client),

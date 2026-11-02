@@ -28,104 +28,38 @@ Future<void> showContentReportDialog(
       ).showSnackBar(SnackBar(content: Text(AppStrings.t('report.noReasons'))));
       return;
     }
-    final description = TextEditingController();
-    String? selected = '${types.first['violationTypeId'] ?? ''}';
-    final submitted = await showModalBottomSheet<bool>(
+    final draft = await showModalBottomSheet<_ReportDraft>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, refresh) => ScrollableSheet(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ModalHeader(
-                  padding: EdgeInsets.zero,
-                  title: AppStrings.format('report.title', {
-                    'target': _targetLabel(targetType),
-                  }),
-                  subtitle: AppStrings.t('report.instruction'),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: selected,
-                  decoration: InputDecoration(
-                    labelText: AppStrings.t('report.reason'),
-                  ),
-                  items: [
-                    for (final type in types)
-                      DropdownMenuItem(
-                        value: '${type['violationTypeId'] ?? ''}',
-                        child: Text(
-                          '${type['name'] ?? type['code'] ?? AppStrings.t('report.other')}',
-                        ),
-                      ),
-                  ],
-                  onChanged: (value) => refresh(() => selected = value),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: description,
-                  minLines: 3,
-                  maxLines: 5,
-                  maxLength: 1000,
-                  onChanged: (_) => refresh(() {}),
-                  decoration: InputDecoration(
-                    labelText: AppStrings.t('report.description'),
-                    hintText: AppStrings.t('report.descriptionHint'),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  onPressed: selected == null || description.text.trim().isEmpty
-                      ? null
-                      : () => Navigator.pop(sheetContext, true),
-                  child: Text(AppStrings.t('report.submit')),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(sheetContext, false),
-                  child: Text(AppStrings.t('common.cancel')),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      builder: (_) => _ContentReportSheet(targetType: targetType, types: types),
     );
-    if (submitted != true || selected == null || !context.mounted) {
-      description.dispose();
-      return;
-    }
+    if (draft == null || !context.mounted) return;
     try {
-      final details = description.text.trim();
       switch (targetType) {
         case 'video':
           await service.reportVideo(
             videoId: targetId,
-            violationTypeId: selected!,
-            description: details,
+            violationTypeId: draft.violationTypeId,
+            description: draft.description,
           );
         case 'channel':
           await service.reportChannel(
             channelId: targetId,
-            violationTypeId: selected!,
-            description: details,
+            violationTypeId: draft.violationTypeId,
+            description: draft.description,
           );
         case 'comment':
           await service.reportComment(
             commentId: targetId,
-            violationTypeId: selected!,
-            description: details,
+            violationTypeId: draft.violationTypeId,
+            description: draft.description,
           );
         default:
           await service.createReport(
             targetType: targetType,
             targetId: targetId,
-            violationTypeId: selected!,
-            description: details,
+            violationTypeId: draft.violationTypeId,
+            description: draft.description,
           );
       }
       if (context.mounted) {
@@ -139,8 +73,6 @@ Future<void> showContentReportDialog(
           context,
         ).showSnackBar(SnackBar(content: Text(AppStrings.apiError(error))));
       }
-    } finally {
-      description.dispose();
     }
   } on ApiFailure catch (error) {
     if (context.mounted) {
@@ -149,6 +81,106 @@ Future<void> showContentReportDialog(
       ).showSnackBar(SnackBar(content: Text(AppStrings.apiError(error))));
     }
   }
+}
+
+class _ReportDraft {
+  const _ReportDraft({
+    required this.violationTypeId,
+    required this.description,
+  });
+
+  final String violationTypeId;
+  final String description;
+}
+
+class _ContentReportSheet extends StatefulWidget {
+  const _ContentReportSheet({required this.targetType, required this.types});
+
+  final String targetType;
+  final List<Map<String, dynamic>> types;
+
+  @override
+  State<_ContentReportSheet> createState() => _ContentReportSheetState();
+}
+
+class _ContentReportSheetState extends State<_ContentReportSheet> {
+  late final TextEditingController _description = TextEditingController();
+  late String? _selected = '${widget.types.first['violationTypeId'] ?? ''}';
+
+  @override
+  void dispose() {
+    _description.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => StatefulBuilder(
+    builder: (context, refresh) => ScrollableSheet(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ModalHeader(
+              padding: EdgeInsets.zero,
+              title: AppStrings.format('report.title', {
+                'target': _targetLabel(widget.targetType),
+              }),
+              subtitle: AppStrings.t('report.instruction'),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _selected,
+              decoration: InputDecoration(
+                labelText: AppStrings.t('report.reason'),
+              ),
+              items: [
+                for (final type in widget.types)
+                  DropdownMenuItem(
+                    value: '${type['violationTypeId'] ?? ''}',
+                    child: Text(
+                      '${type['name'] ?? type['code'] ?? AppStrings.t('report.other')}',
+                    ),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _selected = value),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _description,
+              minLines: 3,
+              maxLines: 5,
+              maxLength: 1000,
+              onChanged: (_) => refresh(() {}),
+              decoration: InputDecoration(
+                labelText: AppStrings.t('report.description'),
+                hintText: AppStrings.t('report.descriptionHint'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            FilledButton(
+              onPressed: _selected == null || _description.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.pop(
+                      context,
+                      _ReportDraft(
+                        violationTypeId: _selected!,
+                        description: _description.text.trim(),
+                      ),
+                    ),
+              child: Text(AppStrings.t('report.submit')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(AppStrings.t('common.cancel')),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 String _targetLabel(String targetType) => switch (targetType) {

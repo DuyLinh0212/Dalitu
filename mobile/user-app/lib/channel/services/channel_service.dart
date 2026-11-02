@@ -76,7 +76,7 @@ class ChannelService {
     String? description,
     String? contactEmail,
   }) async {
-    final clean = handle.startsWith('@') ? handle.substring(1) : handle;
+    final clean = normalizeChannelHandle(handle);
     final res = await auth.protected(
       'POST',
       '/channels',
