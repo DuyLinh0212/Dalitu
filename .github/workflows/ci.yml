@@ -96,6 +96,13 @@ jobs:
           dotnet-version: "10.0.x"
       - run: dotnet restore backend/HuTube.sln
       - run: dotnet build backend/HuTube.sln --no-restore --configuration Release
+      - name: Install FFmpeg for media integration tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -hide_banner -version
+          ffprobe -hide_banner -version
+          ffmpeg -hide_banner -encoders | grep -q libx264
       - name: Unit tests
         run: dotnet test backend/tests/HuTube.UnitTests --no-build --configuration Release --logger trx
       - name: Integration tests against PostgreSQL
