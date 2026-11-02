@@ -290,7 +290,7 @@ class _UploadProgressDialog extends StatelessWidget {
 
       return Dialog(
         key: const ValueKey('upload-progress-dialog'),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         child: ConstrainedBox(
           constraints: BoxConstraints(
