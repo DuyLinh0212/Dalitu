@@ -158,8 +158,8 @@ class _HuTubeAppState extends State<HuTubeApp> {
           playback: playback,
           notifications: notifications,
           location: state.uri.path,
-          child: child,
           uploadController: _uploads,
+          child: child,
         ),
         routes: [
           GoRoute(
