@@ -23,6 +23,7 @@ class MobileScaffold extends StatelessWidget {
     required this.notifications,
     required this.location,
     required this.child,
+    this.uploadController,
   });
 
   final AuthController auth;
@@ -30,6 +31,7 @@ class MobileScaffold extends StatelessWidget {
   final NotificationCenter notifications;
   final String location;
   final Widget child;
+  final UploadController? uploadController;
 
   int get _selectedIndex {
     if (location.startsWith('/explore')) return 1;
@@ -262,8 +264,8 @@ class MobileScaffold extends StatelessWidget {
                 ],
               ),
         drawer: isDetail ? null : _Drawer(auth: auth),
-        floatingActionButton: auth.authenticated
-            ? UploadTray(controller: UploadScope.of(context))
+        floatingActionButton: uploadController != null
+            ? UploadTray(controller: uploadController!)
             : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: SafeArea(

@@ -60,7 +60,7 @@ void main() {
   );
 
   testWidgets(
-    'global upload tray has an Overlay for its tooltip and dismisses',
+    'upload progress button opens details and can dismiss the upload',
     (tester) async {
       final client = MockClient((_) async => jsonResponse({'items': []}));
       final auth = AuthController(ApiClient(client: client), MemoryStore());
@@ -80,16 +80,22 @@ void main() {
       AppPictureInPicture.active.value = false;
       await tester.pump();
       expect(tester.takeException(), isNull);
-      final close = find.descendant(
-        of: find.byType(UploadTray),
-        matching: find.byTooltip(AppStrings.t('parity.close')),
-      );
+      final progress = find.byKey(const ValueKey('upload-progress-button'));
+      expect(progress, findsOneWidget);
+      await tester.tap(progress);
+      await tester.pumpAndSettle();
+      expect(find.text('test-video.mp4'), findsOneWidget);
+      final close = find.byTooltip(AppStrings.t('parity.close'));
       expect(close, findsOneWidget);
       expect(Overlay.maybeOf(tester.element(close)), isNotNull);
-      await tester.longPress(close);
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text(AppStrings.t('parity.close')), findsOneWidget);
       await tester.tap(close);
+      await tester.pumpAndSettle();
+      expect(uploads.visible, isTrue);
+      await tester.tap(progress);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(TextButton, AppStrings.t('parity.close')),
+      );
       await tester.pumpAndSettle();
       expect(uploads.visible, isFalse);
       expect(find.text('test-video.mp4'), findsNothing);

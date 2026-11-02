@@ -292,6 +292,13 @@ void main() {
             expect(find.text(records.first.title), findsOneWidget);
             expect(find.byIcon(Icons.cloud_download_outlined), findsNothing);
             expect(find.byIcon(Icons.download_outlined), findsNothing);
+            final progress = find.byKey(
+              const ValueKey('upload-progress-button'),
+            );
+            expect(progress, findsOneWidget);
+            await tester.tap(progress);
+            await tester.pumpAndSettle();
+            expect(find.text('chuyen-di-cuoi-tuan.mp4'), findsOneWidget);
             expect(find.text('60% · 24.0 MB / 40.0 MB'), findsOneWidget);
             for (final imageWidget in tester.widgetList<Image>(
               find.byType(Image),
@@ -347,9 +354,19 @@ void main() {
               }
             }
             await tester.tap(find.byTooltip(AppStrings.t('parity.close')));
-            await tester.pump();
+            await tester.pumpAndSettle();
             expect(
-              find.byKey(const ValueKey('upload-progress-card')),
+              find.byKey(const ValueKey('upload-progress-dialog')),
+              findsNothing,
+            );
+            await tester.tap(progress);
+            await tester.pumpAndSettle();
+            await tester.tap(
+              find.widgetWithText(TextButton, AppStrings.t('parity.close')),
+            );
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('upload-progress-button')),
               findsNothing,
             );
             await tester.pumpWidget(const SizedBox.shrink());
