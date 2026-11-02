@@ -324,6 +324,8 @@ class _UploadProgressDialog extends StatelessWidget {
                             liveRegion: true,
                             child: Text(
                               title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(
                                     color: accent,
@@ -398,8 +400,10 @@ class _UploadProgressDialog extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 4,
+                  runSpacing: 4,
                   children: [
                     if (c.busy)
                       TextButton.icon(
@@ -412,7 +416,6 @@ class _UploadProgressDialog extends StatelessWidget {
                         onPressed: () => close(dismissUpload: true),
                         child: Text(AppStrings.t('parity.close')),
                       ),
-                      const SizedBox(width: 4),
                       FilledButton.icon(
                         onPressed: c.retry,
                         icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -441,7 +444,8 @@ String _uploadTitle(UploadController controller) =>
       UploadPhase.completed => 'parity.uploadDone',
       UploadPhase.partial => 'parity.playlistPartial',
       UploadPhase.cancelled => 'parity.cancelled',
-      _ => 'parity.uploadFailed',
+      UploadPhase.failed => 'uploadTray.failed',
+      _ => 'uploadTray.failed',
     });
 
 IconData _uploadIcon(UploadController controller) => switch (controller.phase) {

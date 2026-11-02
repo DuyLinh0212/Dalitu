@@ -594,6 +594,7 @@ class AppStrings {
 
       'uploadTray.uploading': 'Đang tải video lên',
       'uploadTray.processing': 'Đang xử lý video',
+      'uploadTray.failed': 'Tải lên thất bại',
       'uploadTray.processingHint':
           'Đã truyền xong file. Bạn có thể tiếp tục dùng app.',
       'uploadTray.connecting': 'Đang kết nối…',
@@ -2204,6 +2205,7 @@ class AppStrings {
 
       'uploadTray.uploading': 'Uploading video',
       'uploadTray.processing': 'Processing video',
+      'uploadTray.failed': 'Upload failed',
       'uploadTray.processingHint': 'File sent. You can keep using the app.',
       'uploadTray.connecting': 'Connecting…',
       'downloads.videoFallback': 'Video',
