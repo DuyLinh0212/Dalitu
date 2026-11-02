@@ -83,10 +83,13 @@ class VideoUploadTransport {
       started = true;
       final chunkSize = session['chunkSize'];
       final next = session['nextChunk'];
+      final protocol = session['chunkProtocol'] ?? 1;
       if (session['uploadId'] != uploadId ||
           chunkSize is! int ||
           chunkSize <= 0 ||
           chunkSize > 8 * 1024 * 1024 ||
+          protocol is! int ||
+          ![1, 2].contains(protocol) ||
           next is! int ||
           next < 0 ||
           next > (length / chunkSize).ceil()) {
@@ -104,9 +107,12 @@ class VideoUploadTransport {
           final offset = index * chunkSize;
           await file.setPosition(offset);
           final bytes = await file.read(min(chunkSize, length - offset));
+          final chunkPath = protocol == 2
+              ? '$path/chunks'
+              : '$path/chunks/$index';
           final result = await attempt(
             () => auth.protectedMultipart(
-              '$path/chunks/$index',
+              chunkPath,
               fields: const {},
               files: [
                 MultipartFilePayload(
@@ -117,6 +123,9 @@ class VideoUploadTransport {
                   bytes: bytes,
                 ),
               ],
+              headers: protocol == 2
+                  ? {'X-Upload-Chunk-Index': '$index'}
+                  : null,
               uploadControl: control,
               onProgress: (sent, total) => onProgress?.call(
                 offset +

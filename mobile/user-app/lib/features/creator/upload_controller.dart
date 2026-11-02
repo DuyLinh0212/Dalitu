@@ -205,6 +205,7 @@ class UploadScope extends InheritedNotifier<UploadController> {
 class UploadTray extends StatelessWidget {
   const UploadTray({super.key, required this.controller});
   final UploadController controller;
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([controller, AppPictureInPicture.active]),
@@ -214,211 +215,246 @@ class UploadTray extends StatelessWidget {
         return const SizedBox.shrink();
       }
       final colors = Theme.of(context).colorScheme;
-      final failed = c.phase == UploadPhase.failed;
-      final done = c.phase == UploadPhase.completed;
-      final accent = failed
-          ? colors.error
-          : done
-          ? const Color(0xFF10B981)
-          : colors.primary;
-      final title = AppStrings.t(switch (c.phase) {
-        UploadPhase.uploading => 'uploadTray.uploading',
-        UploadPhase.processing => 'uploadTray.processing',
-        UploadPhase.completed => 'parity.uploadDone',
-        UploadPhase.partial => 'parity.playlistPartial',
-        UploadPhase.cancelled => 'parity.cancelled',
-        _ => 'parity.uploadFailed',
-      });
-      final statusIcon = failed
-          ? Icons.error_outline_rounded
-          : done
-          ? Icons.check_rounded
-          : c.phase == UploadPhase.cancelled
-          ? Icons.pause_rounded
-          : c.phase == UploadPhase.partial
-          ? Icons.playlist_add_check_rounded
-          : Icons.arrow_upward_rounded;
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-          child: Align(
-            heightFactor: 1,
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: Material(
-                key: const ValueKey('upload-progress-card'),
-                elevation: 1,
-                shadowColor: colors.shadow.withValues(alpha: .08),
-                color: colors.surfaceContainerLow,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: colors.outlineVariant.withValues(alpha: .6),
+      final accent = _uploadAccent(colors, c);
+      final title = _uploadTitle(c);
+      return Semantics(
+        button: true,
+        label: '$title, ${c.fileName}',
+        value: c.phase == UploadPhase.uploading && c.progress != null
+            ? '${((c.progress!) * 100).round()}%'
+            : null,
+        child: FloatingActionButton.small(
+          key: const ValueKey('upload-progress-button'),
+          heroTag: 'upload-progress-button',
+          tooltip: title,
+          backgroundColor: colors.surfaceContainerLow,
+          foregroundColor: accent,
+          elevation: 2,
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => _UploadProgressDialog(controller: c),
+          ),
+          child: SizedBox.square(
+            dimension: 30,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (c.busy)
+                  Positioned.fill(
+                    child: CircularProgressIndicator(
+                      value: c.phase == UploadPhase.uploading
+                          ? c.progress
+                          : null,
+                      strokeWidth: 2.5,
+                      color: accent,
+                      backgroundColor: accent.withValues(alpha: .16),
+                    ),
+                  )
+                else
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: accent, width: 2),
+                      ),
+                    ),
                   ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: SizedBox(
-                          width: 38,
-                          height: 38,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: accent.withValues(alpha: .1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: SizedBox.expand(
-                                  child: Icon(
-                                    statusIcon,
-                                    size: 20,
-                                    color: accent,
-                                  ),
-                                ),
-                              ),
-                              if (c.busy)
-                                SizedBox.expand(
-                                  child: CircularProgressIndicator(
-                                    value: c.phase == UploadPhase.uploading
-                                        ? c.progress
-                                        : null,
-                                    strokeWidth: 2.5,
-                                    color: accent,
-                                    backgroundColor: accent.withValues(
-                                      alpha: .1,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Semantics(
-                              liveRegion: true,
-                              child: Text(
-                                title,
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(
-                                      color: accent,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              c.fileName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            if (c.phase == UploadPhase.uploading) ...[
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: c.progress,
-                                  minHeight: 4,
-                                  color: accent,
-                                  backgroundColor: accent.withValues(
-                                    alpha: .12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                c.total > 0
-                                    ? '${((c.progress ?? 0) * 100).round()}% · ${_bytes(c.sent)} / ${_bytes(c.total)}'
-                                    : AppStrings.t('uploadTray.connecting'),
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: colors.onSurfaceVariant),
-                              ),
-                            ],
-                            if (c.phase == UploadPhase.processing) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                AppStrings.t('uploadTray.processingHint'),
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: colors.onSurfaceVariant),
-                              ),
-                            ],
-                            if (c.error != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                c.error!,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: colors.onSurfaceVariant,
-                                      height: 1.4,
-                                    ),
-                              ),
-                            ],
-                            if (!c.busy && !done)
-                              TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  minimumSize: const Size(48, 44),
-                                  alignment: Alignment.centerLeft,
-                                ),
-                                onPressed: c.retry,
-                                icon: const Icon(
-                                  Icons.refresh_rounded,
-                                  size: 18,
-                                ),
-                                label: Text(AppStrings.t('parity.retry')),
-                              ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: AppStrings.t(
-                          c.busy ? 'parity.cancel' : 'parity.close',
-                        ),
-                        onPressed: c.busy ? c.cancel : c.dismiss,
-                        icon: Icon(
-                          c.busy
-                              ? Icons.stop_circle_outlined
-                              : Icons.close_rounded,
-                          size: 22,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                Icon(_uploadIcon(c), size: 16, color: accent),
+              ],
             ),
           ),
         ),
       );
     },
   );
+}
 
-  static String _bytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+class _UploadProgressDialog extends StatelessWidget {
+  const _UploadProgressDialog({required this.controller});
+  final UploadController controller;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: controller,
+    builder: (context, _) {
+      final c = controller;
+      final colors = Theme.of(context).colorScheme;
+      final accent = _uploadAccent(colors, c);
+      final title = _uploadTitle(c);
+      final done = c.phase == UploadPhase.completed;
+
+      void close({bool dismissUpload = false}) {
+        if (dismissUpload) c.dismiss();
+        Navigator.of(context).pop();
+      }
+
+      return Dialog(
+        key: const ValueKey('upload-progress-dialog'),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accent.withValues(alpha: .1),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(_uploadIcon(c), color: accent, size: 21),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: accent,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            c.fileName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: AppStrings.t('parity.close'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => close(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                if (c.phase == UploadPhase.uploading) ...[
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: c.progress,
+                      minHeight: 5,
+                      color: accent,
+                      backgroundColor: accent.withValues(alpha: .12),
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    c.total > 0
+                        ? '${((c.progress ?? 0) * 100).round()}% · ${_formatUploadBytes(c.sent)} / ${_formatUploadBytes(c.total)}'
+                        : AppStrings.t('uploadTray.connecting'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ] else if (c.phase == UploadPhase.processing) ...[
+                  const SizedBox(height: 9),
+                  Text(
+                    AppStrings.t('uploadTray.processingHint'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (c.error != null) ...[
+                  const SizedBox(height: 9),
+                  Text(
+                    c.error!,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.error,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (c.busy)
+                      TextButton.icon(
+                        onPressed: c.cancel,
+                        icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                        label: Text(AppStrings.t('parity.cancel')),
+                      )
+                    else if (!done) ...[
+                      TextButton(
+                        onPressed: () => close(dismissUpload: true),
+                        child: Text(AppStrings.t('parity.close')),
+                      ),
+                      const SizedBox(width: 4),
+                      FilledButton.icon(
+                        onPressed: c.retry,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: Text(AppStrings.t('parity.retry')),
+                      ),
+                    ] else
+                      FilledButton(
+                        onPressed: () => close(dismissUpload: true),
+                        child: Text(AppStrings.t('parity.close')),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+String _uploadTitle(UploadController controller) =>
+    AppStrings.t(switch (controller.phase) {
+      UploadPhase.uploading => 'uploadTray.uploading',
+      UploadPhase.processing => 'uploadTray.processing',
+      UploadPhase.completed => 'parity.uploadDone',
+      UploadPhase.partial => 'parity.playlistPartial',
+      UploadPhase.cancelled => 'parity.cancelled',
+      _ => 'parity.uploadFailed',
+    });
+
+IconData _uploadIcon(UploadController controller) => switch (controller.phase) {
+  UploadPhase.failed => Icons.error_outline_rounded,
+  UploadPhase.completed => Icons.check_rounded,
+  UploadPhase.cancelled => Icons.pause_rounded,
+  UploadPhase.partial => Icons.playlist_add_check_rounded,
+  _ => Icons.arrow_upward_rounded,
+};
+
+Color _uploadAccent(ColorScheme colors, UploadController controller) =>
+    switch (controller.phase) {
+      UploadPhase.failed => colors.error,
+      UploadPhase.completed => const Color(0xFF10B981),
+      _ => colors.primary,
+    };
+
+String _formatUploadBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  if (bytes < 1024 * 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
+  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
 }

@@ -422,8 +422,7 @@ class _HuTubeAppState extends State<HuTubeApp> {
         darkTheme: AppTheme.darkTheme,
         themeMode: themeMode,
         routerConfig: _router,
-        // The banner and upload tray are outside the router's Navigator.
-        // Give these global controls an Overlay for tooltips and menus too.
+        // The banner is outside the router's Navigator.
         builder: (context, child) => Overlay.wrap(
           child: FeedbackSurveyHost(
             auth: widget.auth,
@@ -433,12 +432,7 @@ class _HuTubeAppState extends State<HuTubeApp> {
               api: widget.auth.api,
               child: UploadScope(
                 controller: _uploads,
-                child: Column(
-                  children: [
-                    Expanded(child: child ?? const SizedBox.shrink()),
-                    UploadTray(controller: _uploads),
-                  ],
-                ),
+                child: child ?? const SizedBox.shrink(),
               ),
             ),
           ),

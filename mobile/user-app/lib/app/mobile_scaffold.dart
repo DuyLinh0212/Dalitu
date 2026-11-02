@@ -13,6 +13,7 @@ import '../core/widgets/app_logo.dart';
 import '../features/content/mini_player.dart';
 import '../features/content/playback_session.dart';
 import '../features/notifications/notification_center.dart';
+import '../features/creator/upload_controller.dart';
 
 class MobileScaffold extends StatelessWidget {
   const MobileScaffold({
@@ -261,6 +262,10 @@ class MobileScaffold extends StatelessWidget {
                 ],
               ),
         drawer: isDetail ? null : _Drawer(auth: auth),
+        floatingActionButton: auth.authenticated
+            ? UploadTray(controller: UploadScope.of(context))
+            : null,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: SafeArea(
           top: false,
           left: !isDetail,

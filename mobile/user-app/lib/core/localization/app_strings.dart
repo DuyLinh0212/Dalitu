@@ -119,7 +119,8 @@ class AppStrings {
       'parity.playlist': 'Thêm vào danh sách phát',
       'parity.playlistPartial':
           'Video đã lưu, nhưng chưa thêm được vào một số danh sách phát.',
-      'parity.uploadBusy': 'Một video đang được tải lên. Xem khay tiến trình.',
+      'parity.uploadBusy':
+          'Một video đang được tải lên. Mở trạng thái tải lên để xem tiến trình.',
       'parity.cancel': 'Hủy tải lên',
       'parity.cancelled': 'Đã hủy truyền file',
       'parity.uploadDone': 'Video đã được lưu',
@@ -134,7 +135,7 @@ class AppStrings {
       'parity.exportError': 'Không thể xuất chính sách. Hãy thử lại.',
       'parity.exportUnavailable': 'Chức năng này hiện hỗ trợ Android.',
       'parity.uploadFailed':
-          'Tải lên thất bại. Có thể thử lại từ khay tiến trình.',
+          'Tải lên thất bại. Mở trạng thái tải lên để thử lại.',
       'parity.sourceHint':
           'Chất lượng phải không vượt video nguồn và hạn mức gói.',
       'survey.close': 'Đóng lời mời khảo sát',
@@ -1727,7 +1728,7 @@ class AppStrings {
       'parity.playlistPartial':
           'Video saved, but some playlist additions failed.',
       'parity.uploadBusy':
-          'A video is already uploading. Check the upload tray.',
+          'A video is already uploading. Open its status to see progress.',
       'parity.cancel': 'Cancel upload',
       'parity.cancelled': 'File transfer cancelled',
       'parity.uploadDone': 'Video saved',
@@ -1741,7 +1742,7 @@ class AppStrings {
       'parity.print': 'Print policies',
       'parity.exportError': 'Could not export policies. Please retry.',
       'parity.exportUnavailable': 'This feature currently supports Android.',
-      'parity.uploadFailed': 'Upload failed. Retry from the upload tray.',
+      'parity.uploadFailed': 'Upload failed. Open its status to retry.',
       'parity.sourceHint': 'Quality must fit the source and plan limits.',
       'survey.close': 'Close survey invitation',
       'survey.invitationTitle': 'Could you give Dalitu a hand?',
