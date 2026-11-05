@@ -71,7 +71,8 @@
 
           <div class="form-group">
             <label for="chEmail" class="input-label">{{ 'channel.businessEmail' | translate }}</label>
-            <input id="chEmail" type="email" class="text-input" [(ngModel)]="contactEmail" [disabled]="busy()" />
+            <input id="chEmail" type="email" class="text-input" [(ngModel)]="contactEmail" [disabled]="busy()" autocomplete="email" maxlength="254" [attr.aria-invalid]="!contactEmailValid()" [attr.aria-describedby]="contactEmailValid() ? null : 'channel-email-error'" />
+            @if (!contactEmailValid()) { <p id="channel-email-error" class="email-error" role="status">{{ 'auth.emailInvalid' | translate }}</p> }
           </div>
 
           <!-- Section: Đường liên kết -->
@@ -126,7 +127,7 @@
           </div>
 
           <div class="form-actions">
-            <button type="button" class="btn-primary" (click)="onSaveBasicInfo()" [disabled]="busy() || handleChecking() || handleValid() === false">
+            <button type="button" class="btn-primary" (click)="onSaveBasicInfo()" [disabled]="busy() || handleChecking() || handleValid() === false || !contactEmailValid()">
               {{ 'channel.save' | translate }}
             </button>
           </div>
@@ -144,7 +145,7 @@
               <button type="button" class="btn-secondary" (click)="avatarInput.click()" [disabled]="busy()">
                 {{ 'channel.changeAvatar' | translate }}
               </button>
-              <input #avatarInput type="file" accept="image/jpeg,image/png,image/webp" (change)="onAvatarSelected($event)" hidden />
+              <input #avatarInput type="file" accept="image/jpeg,image/png,image/webp,image/gif" (change)="onAvatarSelected($event)" hidden />
             </div>
             <div class="branding-preview avatar-preview">
               @if (ch.avatarUrl) {
@@ -352,3 +353,6 @@
     }
   }
 </main>
+@if (avatarCropFile(); as file) {
+  <app-channel-avatar-cropper [file]="file" (cancelled)="avatarCropFile.set(null)" (confirmed)="onAvatarCropped($event)" />
+}

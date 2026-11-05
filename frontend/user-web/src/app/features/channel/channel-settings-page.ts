@@ -18,6 +18,9 @@ import { ContentService } from '../../core/content.service';
 import { I18nService } from '../../core/i18n.service';
 import { LocaleDatePipe } from '../../core/locale-date.pipe';
 import { TranslatePipe } from '../../core/translate.pipe';
+import { ChannelAvatarCropperComponent } from './channel-avatar-cropper.component';
+import { CHANNEL_BRANDING_TRANSLATIONS } from './channel-branding.translations';
+import { avatarFileError, validContactEmail } from './channel-form-validation';
 
 export type ChannelLinkPlatform = 'facebook' | 'instagram' | 'tiktok' | 'x' | 'other';
 
@@ -31,7 +34,7 @@ type SettingsTab = 'basic' | 'branding' | 'members' | 'danger';
 
 @Component({
   selector: 'app-channel-settings-page',
-  imports: [ConfirmDialogComponent, ResultNoticeComponent, LocaleDatePipe, FormsModule, RouterLink, TranslatePipe],
+  imports: [ConfirmDialogComponent, ResultNoticeComponent, LocaleDatePipe, FormsModule, RouterLink, TranslatePipe, ChannelAvatarCropperComponent],
   templateUrl: './channel-settings-page.html',
   styleUrl: './channel-settings-page.scss'
 })
@@ -60,6 +63,7 @@ export class ChannelSettingsPage {
   readonly activeTab = signal<SettingsTab>('basic');
   readonly loading = signal(true);
   readonly busy = signal(false);
+  readonly avatarCropFile = signal<File | null>(null);
   readonly error = signal('');
   readonly message = signal('');
   readonly linkOptions: ChannelLinkPlatform[] = ['facebook', 'instagram', 'tiktok', 'x', 'other'];
@@ -84,6 +88,7 @@ export class ChannelSettingsPage {
   showDeleteModal = signal(false);
 
   constructor() {
+    this.i18n.registerTranslations(CHANNEL_BRANDING_TRANSLATIONS);
     this.destroyRef.onDestroy(() => clearTimeout(this.handleTimer));
     this.loadChannel();
   }
@@ -346,6 +351,7 @@ export class ChannelSettingsPage {
   onSaveBasicInfo() {
     const channel = this.channel();
     if (!channel || this.busy() || !this.can('channel.edit_profile')) return;
+    if (!this.contactEmailValid()) return this.error.set(this.i18n.t('auth.emailInvalid'));
     if (!this.name.trim()) return this.error.set(this.i18n.t('channel.nameEmpty'));
     const cleanHandle = this.handle.trim().replace(/^@/, '');
     if (cleanHandle.length < 3) return this.error.set(this.i18n.t('channel.handleLength'));
@@ -414,13 +420,25 @@ export class ChannelSettingsPage {
 
   linkUrlValid(value: string): boolean { return !value.trim() || this.isValidLinkUrl(value); }
 
+  contactEmailValid(): boolean { return validContactEmail(this.contactEmail); }
+
   onAvatarSelected(event: Event) {
     const channel = this.channel();
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!channel || !file || !this.can('channel.edit_branding')) return;
-    this.runAction(this.channelService.uploadAvatar(channel.channelId, file), this.i18n.t('channel.avatarSaved'));
     input.value = '';
+    if (!channel || !file || this.busy() || !this.can('channel.edit_branding')) return;
+    const error = avatarFileError(file);
+    if (error) { this.error.set(this.i18n.t(error)); return; }
+    this.clearFeedback();
+    this.avatarCropFile.set(file);
+  }
+
+  onAvatarCropped(file: File) {
+    this.avatarCropFile.set(null);
+    const channel = this.channel();
+    if (!channel || this.busy() || !this.can('channel.edit_branding')) return;
+    this.runAction(this.channelService.uploadAvatar(channel.channelId, file), this.i18n.t('channel.avatarSaved'));
   }
 
   onBannerSelected(event: Event) {

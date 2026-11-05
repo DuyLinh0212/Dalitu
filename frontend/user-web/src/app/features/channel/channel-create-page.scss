@@ -1,3 +1,7 @@
+.email-error { margin: 4px 0 0; color: var(--status-danger-text); font-size: .8rem; line-height: 1.5; }
+input[aria-invalid=true] { border-color: var(--status-danger-text) !important; }
+.avatar-overlap-box:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+
 .create-channel-container {
   max-width: 760px;
   margin: 0 auto;

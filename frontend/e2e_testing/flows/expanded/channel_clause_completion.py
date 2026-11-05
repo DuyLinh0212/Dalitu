@@ -1,4 +1,5 @@
 """Previously unexecuted channel validation, partial failure and deleted-route branches."""
+from support.avatar_crop import confirm_avatar_crop
 import time
 from urllib.parse import urlsplit, parse_qs
 from playwright.sync_api import expect
@@ -56,6 +57,7 @@ def run(suite, config, actors, only_failed=False):
             p.locator('#channelName').fill('  Kênh kiểm thử chuẩn hóa  ')
             p.locator('#channelDescription').fill('  Mô tả chuẩn hóa  ')
             p.locator('.avatar-overlap-box input[type=file]').set_input_files({'name': 'avatar.png', 'mimeType': 'image/png', 'buffer': png_bytes()})
+            confirm_avatar_crop(p)
             p.locator('.banner-box input[type=file]').set_input_files({'name': 'banner.txt', 'mimeType': 'text/plain', 'buffer': b'invalid actual image'})
             with p.expect_response(lambda r: r.request.method == 'POST' and r.url.endswith('/banner')) as banner:
                 response = suite.response(actor, '/channels', lambda: p.locator('button[type=submit]').click(), method='POST', status=201)

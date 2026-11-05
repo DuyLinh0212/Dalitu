@@ -8,11 +8,12 @@ import { ContentService } from '../../core/content.service';
 import { suggestChannelHandle } from '../../core/channel-handle';
 import { ChannelCreatePage } from './channel-create-page';
 import { ChannelSettingsPage } from './channel-settings-page';
+import { validContactEmail } from './channel-form-validation';
 
 describe('Channel handle suggestions and edits', () => {
   let channels: jasmine.SpyObj<ChannelService>;
   beforeEach(() => {
-    channels = jasmine.createSpyObj('channels', ['getMyChannel', 'getMyInvitations', 'getChannel', 'checkHandle', 'updateChannel', 'getRoles']);
+    channels = jasmine.createSpyObj('channels', ['getMyChannel', 'getMyInvitations', 'getChannel', 'checkHandle', 'updateChannel', 'createChannel', 'getRoles']);
     channels.getMyChannel.and.returnValue(of(null as any));
     channels.getMyInvitations.and.returnValue(of([]));
     channels.getRoles.and.returnValue(of([]));
@@ -43,6 +44,42 @@ describe('Channel handle suggestions and edits', () => {
   it('keeps suggestions within the API limit, including names without Latin letters', () => {
     expect(suggestChannelHandle('a'.repeat(100), '12345678').length).toBe(50);
     expect(suggestChannelHandle('日本語', '12345678')).toBe('dalitu-12345678');
+  });
+  it('accepts optional and trimmed email addresses while rejecting URLs and malformed addresses', () => {
+    for (const value of ['', '  ', ' contact+music@example.com ', 'artist@sub.example.com']) {
+      expect(validContactEmail(value)).withContext(value).toBeTrue();
+    }
+    for (const value of ['facebook.com/OrinnMusic', 'https://example.com', 'artist@', '@example.com', 'a@@example.com', 'a b@example.com', 'a..b@example.com', 'a'.repeat(255)+'@example.com']) {
+      expect(validContactEmail(value)).withContext(value).toBeFalse();
+    }
+  });
+  it('blocks invalid contact email before creating a channel, including direct submission', () => {
+    TestBed.overrideComponent(ChannelCreatePage, { set: { template: '', imports: [] } });
+    const fixture = TestBed.createComponent(ChannelCreatePage);
+    const page = fixture.componentInstance;
+    page.contactEmail = 'facebook.com/OrinnMusic';
+    page.onSubmit();
+    expect(channels.createChannel).not.toHaveBeenCalled();
+    expect(page.error()).toBeTruthy();
+    page.contactEmail = ' contact@example.com ';
+    channels.createChannel.and.returnValue(new Subject());
+    page.onSubmit();
+    expect(channels.createChannel.calls.mostRecent().args[0].contactEmail).toBe('contact@example.com');
+    fixture.destroy();
+  });
+  it('blocks invalid contact email before saving an existing channel and still permits clearing it', () => {
+    channels.getChannel.and.returnValue(of({ channelId: 'one', handle: 'lynwa', name: 'Channel', settings: '{}', permissions: ['channel.edit_profile'] } as any));
+    TestBed.overrideComponent(ChannelSettingsPage, { set: { template: '', imports: [] } });
+    const fixture = TestBed.createComponent(ChannelSettingsPage);
+    const page = fixture.componentInstance;
+    page.contactEmail = 'facebook.com/OrinnMusic';
+    page.onSaveBasicInfo();
+    expect(channels.updateChannel).not.toHaveBeenCalled();
+    page.contactEmail = '';
+    channels.updateChannel.and.returnValue(new Subject());
+    page.onSaveBasicInfo();
+    expect(channels.updateChannel.calls.mostRecent().args[1].contactEmail).toBe('');
+    fixture.destroy();
   });
   it('omits an unchanged handle and excludes the current channel when checking edits', fakeAsync(() => {
     channels.getChannel.and.returnValue(of({ channelId: 'one', handle: 'lynwa', name: 'Channel', settings: '{}', permissions: ['channel.edit_profile'] } as any));

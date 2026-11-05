@@ -36,7 +36,12 @@ def run(suite,owner):
                 page.locator('.settings-tabs-nav .tab-btn').nth(1).click()
                 payload={'name':'qc-invalid.txt','mimeType':'text/plain','buffer':b'QC invalid branding'} if invalid_kind=='mime' else {'name':'qc-invalid.png','mimeType':'image/png','buffer':b'' if invalid_kind=='empty' else b'0'*(max_mb*1024*1024+1)}
                 action=lambda:page.locator('.branding-tab-pane input[type=file]').nth(index).set_input_files(payload)
-                if invalid_kind=='size':
+                if kind=='avatar':
+                    action()
+                    expect(page.locator('app-result-notice[tone=error]')).to_be_visible()
+                    expect(page.locator('app-channel-avatar-cropper')).to_have_count(0)
+                    suite.api(owner,'post',path+'/'+kind,multipart={'file':payload},expected=(400,413,415,422))
+                elif invalid_kind=='size':
                     # Kestrel's request-size rejection can lack CORS headers;
                     # the browser then reports requestfailed rather than response.
                     action()

@@ -9,10 +9,13 @@ import { ChannelSummary, ChannelInvitation, ChannelService } from '../../core/ch
 import { AuthService, errorMessage } from '../../core/auth.service';
 import { I18nService } from '../../core/i18n.service';
 import { TranslatePipe } from '../../core/translate.pipe';
+import { ChannelAvatarCropperComponent } from './channel-avatar-cropper.component';
+import { CHANNEL_BRANDING_TRANSLATIONS } from './channel-branding.translations';
+import { avatarFileError, validContactEmail } from './channel-form-validation';
 
 @Component({
   selector: 'app-channel-create-page',
-  imports: [ResultNoticeComponent, FormsModule, RouterLink, TranslatePipe],
+  imports: [ResultNoticeComponent, FormsModule, RouterLink, TranslatePipe, ChannelAvatarCropperComponent],
   providers: [
     { provide: COMPOSITION_BUFFER_MODE, useValue: false }
   ],
@@ -41,6 +44,7 @@ export class ChannelCreatePage {
   readonly error = signal('');
   readonly handleFeedback = signal('');
   readonly handleValid = signal<boolean | null>(null);
+  readonly avatarCropFile = signal<File | null>(null);
 
   name = '';
   handle = '';
@@ -54,9 +58,13 @@ export class ChannelCreatePage {
   private debounceTimer?: any;
 
   constructor() {
+    this.i18n.registerTranslations(CHANNEL_BRANDING_TRANSLATIONS);
     this.name = this.auth.user()?.displayName || this.auth.user()?.username || '';
     this.onNameInput(this.name);
-    this.destroyRef.onDestroy(() => clearTimeout(this.debounceTimer));
+    this.destroyRef.onDestroy(() => {
+      clearTimeout(this.debounceTimer);
+      if (this.avatarPreview) URL.revokeObjectURL(this.avatarPreview);
+    });
     this.checkExisting();
   }
 
@@ -165,13 +173,23 @@ export class ChannelCreatePage {
 
   onAvatarSelected(event: Event) {
     const input = event.target as HTMLInputElement;
-    if (input.files && input.files[0]) {
-      this.avatarFile = input.files[0];
-      const reader = new FileReader();
-      reader.onload = e => this.avatarPreview = e.target?.result as string;
-      reader.readAsDataURL(this.avatarFile);
-    }
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.busy()) return;
+    const error = avatarFileError(file);
+    if (error) { this.error.set(this.i18n.t(error)); return; }
+    this.error.set('');
+    this.avatarCropFile.set(file);
   }
+
+  onAvatarCropped(file: File) {
+    if (this.avatarPreview) URL.revokeObjectURL(this.avatarPreview);
+    this.avatarFile = file;
+    this.avatarPreview = URL.createObjectURL(file);
+    this.avatarCropFile.set(null);
+  }
+
+  contactEmailValid(): boolean { return validContactEmail(this.contactEmail); }
 
   onBannerSelected(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -184,7 +202,12 @@ export class ChannelCreatePage {
   }
 
   onSubmit() {
-    if (this.busy()) return;
+    if (this.busy() || this.avatarCropFile()) return;
+
+    if (!this.contactEmailValid()) {
+      this.error.set(this.i18n.t('auth.emailInvalid'));
+      return;
+    }
 
     if (!this.name.trim()) {
       this.error.set(this.i18n.t('channel.nameError'));
