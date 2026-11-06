@@ -180,11 +180,14 @@
           <div id="download-popover" class="share-popover" role="dialog" [attr.aria-label]="'watch.downloadTitle' | translate">
             <div class="share-popover__header"><div><strong>{{ 'watch.downloadTitle' | translate }}</strong><p>{{ 'watch.downloadDesc' | translate }}</p></div><button type="button" class="share-popover__close" (click)="downloadOpen.set(false)" [attr.aria-label]="'common.close' | translate">×</button></div>
             @if (downloadBusy()) { <p class="replies-status">{{ 'watch.preparing' | translate }}</p> }
-            <div class="share-popover__actions">
-              @for (rendition of downloadOptions(); track rendition.quality) {
-                <button type="button" class="primary-button" (click)="download(rendition.quality)" [disabled]="downloadBusy()">{{ rendition.quality }} · {{ formatBytes(rendition.fileSize) }}</button>
-              } @empty { @if (!downloadBusy()) { <p class="replies-status">{{ 'watch.noDownloadQuality' | translate }}</p> } }
-            </div>
+            @if (downloadNotice()) { <app-result-notice tone="info" [message]="downloadNotice()" /> }
+            @if (downloadOptions().length) {
+              <div class="share-popover__actions">
+                @for (rendition of downloadOptions(); track rendition.quality) {
+                  <button type="button" class="primary-button" (click)="download(rendition.quality)" [disabled]="downloadBusy()">{{ rendition.quality }} · {{ formatBytes(rendition.fileSize) }}</button>
+                }
+              </div>
+            }
           </div>
         }
         @if (playlistPickerOpen()) {

@@ -450,7 +450,7 @@ select:-webkit-autofill {
   }
 
   .plan-card.current-active {
-    background: linear-gradient(to bottom, var(--status-success-bg) 0%, var(--surface) 100px) !important;
+    background: var(--surface) !important;
     border-color: var(--status-success-text) !important;
   }
 

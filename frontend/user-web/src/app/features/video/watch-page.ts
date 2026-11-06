@@ -123,6 +123,7 @@ export class WatchPage {
   readonly downloadOptions = signal<Rendition[]>([]);
   readonly downloadOpen = signal(false);
   readonly downloadBusy = signal(false);
+  readonly downloadNotice = signal('');
   readonly playlistPickerOpen = signal(false);
   readonly playlistOptions = signal<PlaylistSummary[]>([]);
   readonly playlistLoading = signal(false);
@@ -239,6 +240,9 @@ export class WatchPage {
     this.loading.set(true);
     this.error.set('');
     this.video.set(null);
+    this.downloadOptions.set([]);
+    this.downloadOpen.set(false);
+    this.downloadNotice.set('');
     this.videoCardDrawer.set(null);
     this.videoInfoOpen.set(false);
     this.dismissedVideoCardIds.set([]);
@@ -1188,19 +1192,26 @@ export class WatchPage {
 
   openDownloads() {
     if (!this.requireAuthentication(this.i18n.t('watch.loginDownload'))) return;
-    if (this.downloadOptions().length) {
+    if (this.downloadOptions().length || this.downloadNotice()) {
       this.downloadOpen.update(value => !value);
       return;
     }
     if (this.downloadBusy()) return;
+    this.downloadNotice.set('');
     this.downloadBusy.set(true);
     this.content.downloadOptions(this.videoId).pipe(finalize(() => this.downloadBusy.set(false))).pipe(takeUntil(this.videoChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: options => {
         this.downloadOptions.set(options ?? []);
         this.downloadOpen.set(true);
-        if (!options?.length) this.actionMessage.set(this.i18n.t('watch.noDownloadQuality'));
+        if (!options?.length) this.downloadNotice.set(this.i18n.t('watch.noDownloadQuality'));
       },
-      error: error => this.actionMessage.set(this.readError(error) || this.i18n.t('watch.downloadUnsupported'))
+      error: error => {
+        this.downloadOptions.set([]);
+        this.downloadNotice.set(this.isDownloadNotIncluded(error)
+          ? this.i18n.t('watch.downloadUnsupported')
+          : this.readError(error) || this.i18n.t('watch.downloadError'));
+        this.downloadOpen.set(true);
+      }
     });
   }
 
@@ -1215,7 +1226,10 @@ export class WatchPage {
         this.actionMessage.set(this.i18n.t(saved === 'saved' ? 'watch.downloadSaved' : 'watch.downloadStarted'));
       }
     } catch (error) {
-      this.actionMessage.set(this.readError(error) || this.i18n.t('watch.downloadError'));
+      this.downloadNotice.set(this.isDownloadNotIncluded(error)
+        ? this.i18n.t('watch.downloadUnsupported')
+        : this.readError(error) || this.i18n.t('watch.downloadError'));
+      this.downloadOpen.set(true);
     } finally {
       this.downloadBusy.set(false);
     }
@@ -1362,6 +1376,12 @@ export class WatchPage {
 
   private readError(_error: any) {
     return '';
+  }
+
+  private isDownloadNotIncluded(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null || !('error' in error)) return false;
+    const payload = (error as { error?: { code?: unknown } }).error;
+    return payload?.code === 'DOWNLOAD_NOT_INCLUDED';
   }
 
   private requireAuthentication(message: string): boolean {
