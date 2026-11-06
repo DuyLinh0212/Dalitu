@@ -840,6 +840,8 @@ class _ExploreThumbnail extends StatelessWidget {
             Image.network(
               video.thumbnailUrl!,
               fit: BoxFit.cover,
+              cacheWidth: (width * MediaQuery.devicePixelRatioOf(context))
+                  .ceil(),
               errorBuilder: (_, _, _) => const _ExploreThumbnailFallback(),
             )
           else

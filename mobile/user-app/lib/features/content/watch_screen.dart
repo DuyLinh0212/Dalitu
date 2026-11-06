@@ -98,6 +98,7 @@ class _WatchScreenState extends State<WatchScreen> with WidgetsBindingObserver {
   bool _pipEnabled = false;
   bool _pipEntering = false;
   final _videoStageKey = GlobalKey();
+  final _pipSurfaceKey = GlobalKey();
   Timer? _pipRestoreTimer;
   bool _restoringPip = false;
   bool _backgroundPlaybackEnabled = false;
@@ -618,12 +619,7 @@ class _WatchScreenState extends State<WatchScreen> with WidgetsBindingObserver {
     _pipRestoreTimer?.cancel();
     _restoringPip = true;
     AppPictureInPicture.active.value = true;
-    try {
-      WidgetsBinding.instance.scheduleFrame();
-      await WidgetsBinding.instance.endOfFrame.timeout(
-        const Duration(milliseconds: 500),
-      );
-    } on TimeoutException {
+    if (!await AppPictureInPicture.prepareSurface(_pipSurfaceKey)) {
       AppPictureInPicture.active.value = false;
       return false;
     }
@@ -2040,6 +2036,7 @@ class _WatchScreenState extends State<WatchScreen> with WidgetsBindingObserver {
     final renderFullscreen = _isFullScreen || AppPictureInPicture.active.value;
     final videoStage = _CustomVideoStage(
       key: _videoStageKey,
+      surfaceKey: _pipSurfaceKey,
       session: widget.playback,
       isFullScreen: renderFullscreen,
       controlsLocked: _controlsLocked,
@@ -2561,6 +2558,7 @@ class _CustomVideoStage extends StatefulWidget {
     required this.onSettings,
     required this.onPictureInPicture,
     required this.showPictureInPicture,
+    required this.surfaceKey,
     this.isFullScreen = false,
     this.systemPip = false,
     this.controlsLocked = false,
@@ -2575,6 +2573,7 @@ class _CustomVideoStage extends StatefulWidget {
   final VoidCallback onSettings;
   final VoidCallback onPictureInPicture;
   final bool showPictureInPicture;
+  final GlobalKey surfaceKey;
   final bool isFullScreen;
   final bool systemPip;
   final bool controlsLocked;
@@ -2588,6 +2587,7 @@ class _CustomVideoStage extends StatefulWidget {
 }
 
 class _CustomVideoStageState extends State<_CustomVideoStage> {
+  NativeVideoPlayer? _nativeSurface;
   bool _controlsVisible = true;
   Timer? _controlsTimer;
   bool? _seekForward;
@@ -2706,6 +2706,12 @@ class _CustomVideoStageState extends State<_CustomVideoStage> {
     builder: (context, _) {
       final player = widget.session.player;
       if (player == null) return const ColoredBox(color: AppColors.ink);
+      // Only controls need rebuilding on progress ticks. Keep the native
+      // widget identical until its controller changes; inherited layout/theme
+      // changes still reach the mounted native widget normally.
+      if (_nativeSurface?.controller != player) {
+        _nativeSurface = NativeVideoPlayer(controller: player);
+      }
       final total = widget.session.duration.inMilliseconds;
       final current =
           (_dragPosition ?? widget.session.position.inMilliseconds.toDouble())
@@ -2721,7 +2727,10 @@ class _CustomVideoStageState extends State<_CustomVideoStage> {
               : (16 / 9);
 
           final double scale;
-          if (widget.zoomToFill && widget.isFullScreen && height > 0) {
+          if (!widget.systemPip &&
+              widget.zoomToFill &&
+              widget.isFullScreen &&
+              height > 0) {
             final double containerAspect = width / height;
             scale = containerAspect > videoAspect
                 ? (containerAspect / videoAspect)
@@ -2793,7 +2802,8 @@ class _CustomVideoStageState extends State<_CustomVideoStage> {
                       child: AspectRatio(
                         aspectRatio: videoAspect,
                         child: RepaintBoundary(
-                          child: NativeVideoPlayer(controller: player),
+                          key: widget.surfaceKey,
+                          child: PipVideoSurface(child: _nativeSurface!),
                         ),
                       ),
                     ),

@@ -19,6 +19,7 @@ class MiniPlayer extends StatefulWidget {
 class _MiniPlayerState extends State<MiniPlayer> {
   Alignment _alignment = Alignment.bottomRight;
   final _surfaceKey = GlobalKey();
+  NativeVideoPlayer? _nativeSurface;
   @override
   void initState() {
     super.initState();
@@ -39,17 +40,23 @@ class _MiniPlayerState extends State<MiniPlayer> {
       return false;
     }
     final video = session.videoId;
-    WidgetsBinding.instance.scheduleFrame();
-    await WidgetsBinding.instance.endOfFrame.timeout(
-      const Duration(milliseconds: 700),
-    );
-    return mounted && session.videoId == video && session.automaticPipEligible;
+    final ready = await AppPictureInPicture.prepareSurface(_surfaceKey);
+    return ready &&
+        mounted &&
+        session.videoId == video &&
+        session.automaticPipEligible;
   }
 
-  Widget _surface(NativeVideoPlayerController player) => KeyedSubtree(
-    key: _surfaceKey,
-    child: NativeVideoPlayer(controller: player),
-  );
+  Widget _surface(NativeVideoPlayerController player) {
+    if (_nativeSurface?.controller != player) {
+      _nativeSurface = NativeVideoPlayer(controller: player);
+    }
+    return KeyedSubtree(
+      key: _surfaceKey,
+      child: PipVideoSurface(child: _nativeSurface!),
+    );
+  }
+
   PlaybackSession get session => widget.session;
 
   @override
@@ -65,7 +72,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
         return ColoredBox(
           color: Colors.black,
           child: Center(
-            child: AspectRatio(aspectRatio: 16 / 9, child: _surface(player)),
+            child: AspectRatio(
+              aspectRatio: player.videoSize?.aspectRatio ?? 16 / 9,
+              child: _surface(player),
+            ),
           ),
         );
       }

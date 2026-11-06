@@ -419,6 +419,34 @@ void main() {
                   find.text(AppStrings.t('parity.language')),
                   findsWidgets,
                 );
+                final language = find.byKey(const ValueKey('language-vi'));
+                final comments = find.widgetWithText(
+                  SwitchListTile,
+                  AppStrings.t('parity.comments'),
+                );
+                expect(
+                  tester.getTopLeft(comments).dy -
+                      tester.getBottomLeft(language).dy,
+                  greaterThanOrEqualTo(16),
+                );
+                if (capture && size.width == 390 && scale == 1) {
+                  await tester.runAsync(() async {
+                    final image =
+                        await (boundary.currentContext!.findRenderObject()
+                                as RenderRepaintBoundary)
+                            .toImage();
+                    final bytes = await image.toByteData(
+                      format: ui.ImageByteFormat.png,
+                    );
+                    final folder = Directory(
+                      '../../outputs/media-upload-refresh',
+                    )..createSync(recursive: true);
+                    await File(
+                      '${folder.path}/upload-options-${dark ? 'dark' : 'light'}.png',
+                    ).writeAsBytes(bytes!.buffer.asUint8List());
+                    image.dispose();
+                  });
+                }
                 final submit = find.widgetWithText(
                   FilledButton,
                   AppStrings.t('upload.uploadAction'),

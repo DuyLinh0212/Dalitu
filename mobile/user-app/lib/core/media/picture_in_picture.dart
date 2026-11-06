@@ -1,5 +1,10 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// Uses the existing Flutter surface; entering PiP never opens another player.
 class AppPictureInPicture {
@@ -64,6 +69,40 @@ class AppPictureInPicture {
     }
   }
 
+  /// Capture the laid-out video, after PiP has hidden the surrounding app UI.
+  /// Android expects physical window coordinates for its source rectangle.
+  static Future<bool> prepareSurface(GlobalKey surfaceKey) async {
+    try {
+      WidgetsBinding.instance.scheduleFrame();
+      await WidgetsBinding.instance.endOfFrame.timeout(
+        const Duration(milliseconds: 700),
+      );
+      final context = surfaceKey.currentContext;
+      final box = context?.findRenderObject();
+      if (context == null ||
+          !context.mounted ||
+          box is! RenderBox ||
+          !box.hasSize ||
+          box.size.isEmpty) {
+        return false;
+      }
+      final ratio = View.of(context).devicePixelRatio;
+      final rect = box.localToGlobal(Offset.zero) & box.size;
+      await _setSourceRect(rect, ratio);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> _setSourceRect(Rect rect, double ratio) =>
+      channel.invokeMethod<void>('setSourceRect', {
+        'left': (rect.left * ratio).round(),
+        'top': (rect.top * ratio).round(),
+        'right': (rect.right * ratio).round(),
+        'bottom': (rect.bottom * ratio).round(),
+      });
+
   static Future<bool> enter() async {
     try {
       final entered = await channel.invokeMethod<bool>('enter') ?? false;
@@ -81,5 +120,69 @@ class AppPictureInPicture {
     } catch (_) {
       /* Unsupported platforms leave playback in the app. */
     }
+  }
+}
+
+/// Keep Android's automatic PiP source ready while Flutter is still visible.
+/// Leaving the app must not depend on rendering another Flutter frame.
+class PipVideoSurface extends SingleChildRenderObjectWidget {
+  const PipVideoSurface({super.key, required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _PipVideoSurface(
+    View.of(context).devicePixelRatio,
+    defaultTargetPlatform == TargetPlatform.android &&
+        ModalRoute.of(context)?.isCurrent != false,
+  );
+
+  @override
+  void updateRenderObject(BuildContext context, RenderObject renderObject) {
+    final surface = renderObject as _PipVideoSurface;
+    surface
+      ..ratio = View.of(context).devicePixelRatio
+      ..enabled =
+          defaultTargetPlatform == TargetPlatform.android &&
+          ModalRoute.of(context)?.isCurrent != false
+      ..markNeedsPaint();
+  }
+}
+
+class _PipVideoSurface extends RenderProxyBox {
+  _PipVideoSurface(this.ratio, this.enabled);
+  double ratio;
+  bool enabled;
+  Rect? _lastRect;
+  double? _lastRatio;
+  bool _scheduled = false;
+
+  void _report() {
+    if (!enabled || _scheduled) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      if (!attached || !enabled || !hasSize || size.isEmpty) return;
+      final rect = localToGlobal(Offset.zero) & size;
+      if (rect == _lastRect && ratio == _lastRatio) return;
+      _lastRect = rect;
+      _lastRatio = ratio;
+      unawaited(
+        AppPictureInPicture._setSourceRect(
+          rect,
+          ratio,
+        ).catchError((Object _) {}),
+      );
+    });
+  }
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    _report();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    super.paint(context, offset);
+    _report();
   }
 }

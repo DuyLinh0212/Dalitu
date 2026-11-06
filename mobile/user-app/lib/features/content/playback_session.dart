@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:better_native_video_player/better_native_video_player.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../auth.dart';
@@ -245,7 +245,9 @@ class PlaybackSession extends ChangeNotifier with WidgetsBindingObserver {
       ),
       allowsPictureInPicture: allowPip,
       canStartPictureInPictureAutomatically:
-          !Platform.isAndroid && allowPip && _automaticPip,
+          defaultTargetPlatform != TargetPlatform.android &&
+          allowPip &&
+          _automaticPip,
     );
     _auth = auth;
     auth.addListener(_identityChanged);
@@ -510,7 +512,7 @@ class PlaybackSession extends ChangeNotifier with WidgetsBindingObserver {
       _auth?.sessionGeneration == _authGeneration;
 
   void _configurePip() {
-    if (Platform.isAndroid) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
       unawaited(AppPictureInPicture.configure(automatic: automaticPipEligible));
     }
   }

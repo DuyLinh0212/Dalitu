@@ -158,13 +158,16 @@ class VideoUploadTransport {
           uploadControl: control,
         ),
       );
-      while (result['status'] == 'processing' ||
-          result['status'] == 'uploading') {
+      // A completed session returns VideoResponse, whose own status may still
+      // be "processing" (renditions/moderation). Only poll session receipts;
+      // waiting on the video's status can otherwise keep this upload busy forever.
+      while (!_hasVideo(result) &&
+          (result['status'] == 'processing' ||
+              result['status'] == 'uploading')) {
         await pause(pollInterval);
         result = await attempt(() => auth.protected('GET', path));
       }
-      if (result['videoId'] is! String ||
-          (result['videoId'] as String).isEmpty) {
+      if (!_hasVideo(result)) {
         throw const ApiFailure(
           502,
           'INVALID_UPLOAD_RESPONSE',
@@ -186,4 +189,8 @@ class VideoUploadTransport {
       rethrow;
     }
   }
+
+  static bool _hasVideo(Map<String, dynamic> result) =>
+      result['videoId'] is String &&
+      (result['videoId'] as String).trim().isNotEmpty;
 }

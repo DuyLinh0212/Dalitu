@@ -69,9 +69,30 @@ Phát nền kiểm tra quyền gói và chế độ Tắt / Chỉ tai nghe hoặ
 
 PiP thủ công yêu cầu quyền gói; bật cài đặt PiP chỉ quyết định tự mở khi ra
 Home, không cấp thêm quyền. Android dùng Activity và player đang có để vào
-PiP, giữ nguyên tiến độ. Phát nền ở chế độ tai nghe có trạng thái Chờ tai nghe
+PiP, giữ nguyên tiến độ. Video Android render bằng Flutter texture; PiP lấy
+đúng vùng video sau khi ẩn giao diện, không giữ khung nền của player thu nhỏ.
+Khi video đang phát và cài đặt PiP bật, Android 12+ được đăng ký tự vào PiP
+ngay từ lúc xem; Android cũ hơn mở PiP trực tiếp khi về Home. Luồng tự động
+không đợi Flutter dựng thêm khung hình sau khi app đã chuyển nền. Tạm dừng,
+đóng video hoặc tắt cài đặt sẽ tắt đăng ký tự động.
+Phát nền ở chế độ tai nghe có trạng thái Chờ tai nghe
 và có thể tắt yêu cầu ngay từ player. Các ca PiP/khóa màn hình trên APK mới
 vẫn cần xác nhận bằng thiết bị theo checklist.
+
+Upload hoàn tất khi API trả `videoId`, kể cả khi video còn mang trạng thái
+`processing` để tạo chất lượng hoặc chờ kiểm duyệt. Khay upload thông báo đã
+lưu và trạng thái tiếp theo; chỉ báo đã xuất bản khi server trả `published`.
+
+## Hiệu năng player và thumbnail
+
+Màn xem và mini-player giữ nguyên widget video khi chỉ cập nhật tiến độ;
+khi đổi controller, widget vẫn được cập nhật theo controller mới. Test 40 nhịp
+tiến độ, mỗi nhịp 250 ms, giảm số rebuild widget native từ 40 xuống 0 ở cả
+hai chế độ; thanh tiến độ vẫn cập nhật. Đây là số đo widget test, chưa phải
+số đo FPS hoặc pin trên điện thoại thật.
+
+Thumbnail Khám phá giới hạn kích thước giải mã theo chiều rộng hiển thị và
+mật độ điểm ảnh thiết bị. Bố cục, URL ảnh và luồng thao tác giữ nguyên.
 
 ## Kiểm tra
 

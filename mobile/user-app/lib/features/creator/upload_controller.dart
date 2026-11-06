@@ -41,11 +41,18 @@ class UploadController extends ChangeNotifier {
   int _session = -1;
   int _run = 0;
   bool _disposed = false;
+  bool _detailsOpen = false;
   UploadControl? _control;
   bool get busy =>
       phase == UploadPhase.uploading || phase == UploadPhase.processing;
   bool get visible => phase != UploadPhase.idle;
+  bool get detailsOpen => _detailsOpen;
   double? get progress => total > 0 ? (sent / total).clamp(0, 1) : null;
+  void setDetailsOpen(bool value) {
+    if (_detailsOpen == value) return;
+    _detailsOpen = value;
+    _notify();
+  }
   void _notify() {
     if (!_disposed) notifyListeners();
   }
@@ -211,62 +218,209 @@ class UploadTray extends StatelessWidget {
     listenable: Listenable.merge([controller, AppPictureInPicture.active]),
     builder: (context, _) {
       final c = controller;
-      if (!c.visible || AppPictureInPicture.active.value) {
+      if (!c.visible || c.detailsOpen || AppPictureInPicture.active.value) {
         return const SizedBox.shrink();
       }
       final colors = Theme.of(context).colorScheme;
+      final failed = c.phase == UploadPhase.failed;
+      final done = c.phase == UploadPhase.completed;
       final accent = _uploadAccent(colors, c);
       final title = _uploadTitle(c);
-      return Semantics(
-        button: true,
-        label: '$title, ${c.fileName}',
-        value: c.phase == UploadPhase.uploading && c.progress != null
-            ? '${((c.progress!) * 100).round()}%'
-            : null,
-        child: FloatingActionButton.small(
-          key: const ValueKey('upload-progress-button'),
-          heroTag: 'upload-progress-button',
-          tooltip: title,
-          backgroundColor: colors.surfaceContainerLow,
-          foregroundColor: accent,
-          elevation: 2,
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) => _UploadProgressDialog(controller: c),
-          ),
-          child: SizedBox.square(
-            dimension: 30,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (c.busy)
-                  Positioned.fill(
-                    child: CircularProgressIndicator(
-                      value: c.phase == UploadPhase.uploading
-                          ? c.progress
-                          : null,
-                      strokeWidth: 2.5,
-                      color: accent,
-                      backgroundColor: accent.withValues(alpha: .16),
-                    ),
-                  )
-                else
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: accent, width: 2),
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
+          child: Align(
+            heightFactor: 1,
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Material(
+                key: const ValueKey('upload-progress-card'),
+                elevation: 1,
+                shadowColor: colors.shadow.withValues(alpha: .08),
+                color: colors.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: colors.outlineVariant.withValues(alpha: .6),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        label: '$title, ${c.fileName}',
+                        value: c.phase == UploadPhase.uploading &&
+                                c.progress != null
+                            ? '${((c.progress!) * 100).round()}%'
+                            : null,
+                        child: InkWell(
+                          key: const ValueKey('upload-progress-button'),
+                          onTap: () => unawaited(
+                            _showUploadProgressDialog(context, c),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 32,
+                                  height: 32,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: accent.withValues(alpha: .1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: SizedBox.expand(
+                                          child: Icon(
+                                            failed
+                                                ? Icons.error_outline_rounded
+                                                : done
+                                                ? Icons.check_rounded
+                                                : c.phase == UploadPhase.cancelled
+                                                ? Icons.pause_rounded
+                                                : c.phase == UploadPhase.partial
+                                                ? Icons.playlist_add_check_rounded
+                                                : Icons.arrow_upward_rounded,
+                                            size: 20,
+                                            color: accent,
+                                          ),
+                                        ),
+                                      ),
+                                      if (c.busy)
+                                        SizedBox.expand(
+                                          child: CircularProgressIndicator(
+                                            value:
+                                                c.phase == UploadPhase.uploading
+                                                ? c.progress
+                                                : null,
+                                            strokeWidth: 2.5,
+                                            color: accent,
+                                            backgroundColor: accent.withValues(
+                                              alpha: .1,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Semantics(
+                                        liveRegion: true,
+                                        child: Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelMedium
+                                              ?.copyWith(
+                                                color: accent,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        c.fileName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      if (c.phase == UploadPhase.uploading) ...[
+                                        const SizedBox(height: 7),
+                                        ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          child: LinearProgressIndicator(
+                                            value: c.progress,
+                                            minHeight: 4,
+                                            color: accent,
+                                            backgroundColor: accent.withValues(
+                                              alpha: .12,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          c.total > 0
+                                              ? '${((c.progress ?? 0) * 100).round()}% · ${_formatUploadBytes(c.sent)} / ${_formatUploadBytes(c.total)}'
+                                              : AppStrings.t(
+                                                  'uploadTray.connecting',
+                                                ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: colors.onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                Icon(_uploadIcon(c), size: 16, color: accent),
-              ],
+                    IconButton(
+                      tooltip: AppStrings.t(
+                        c.busy ? 'parity.cancel' : 'parity.close',
+                      ),
+                      onPressed: c.busy ? c.cancel : c.dismiss,
+                      icon: Icon(
+                        c.busy
+                            ? Icons.stop_circle_outlined
+                            : Icons.close_rounded,
+                        size: 22,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       );
     },
   );
+}
+
+Future<void> _showUploadProgressDialog(
+  BuildContext context,
+  UploadController controller,
+) async {
+  if (controller.detailsOpen) return;
+  controller.setDetailsOpen(true);
+  try {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _UploadProgressDialog(controller: controller),
+    );
+  } finally {
+    controller.setDetailsOpen(false);
+  }
 }
 
 class _UploadProgressDialog extends StatelessWidget {
@@ -437,16 +591,32 @@ class _UploadProgressDialog extends StatelessWidget {
   );
 }
 
-String _uploadTitle(UploadController controller) =>
-    AppStrings.t(switch (controller.phase) {
-      UploadPhase.uploading => 'uploadTray.uploading',
-      UploadPhase.processing => 'uploadTray.processing',
-      UploadPhase.completed => 'parity.uploadDone',
-      UploadPhase.partial => 'parity.playlistPartial',
-      UploadPhase.cancelled => 'parity.cancelled',
-      UploadPhase.failed => 'uploadTray.failed',
-      _ => 'uploadTray.failed',
-    });
+String _uploadTitle(UploadController controller) {
+  final video = controller.video;
+  return AppStrings.t(switch (controller.phase) {
+    UploadPhase.uploading => 'uploadTray.uploading',
+    UploadPhase.processing => 'uploadTray.processing',
+    UploadPhase.completed => video?.processingStatus == 'published'
+        ? 'uploadTray.published'
+        : _savedHint(video) ?? 'parity.uploadDone',
+    UploadPhase.partial => 'parity.playlistPartial',
+    UploadPhase.cancelled => 'parity.cancelled',
+    UploadPhase.failed => 'uploadTray.failed',
+    _ => 'uploadTray.failed',
+  });
+}
+
+String? _savedHint(VideoDetail? video) {
+  if (video?.processingStatus == 'failed') return 'uploadTray.savedFailed';
+  if (video?.moderationStatus == 'pending' ||
+      video?.moderationStatus == 'reviewing') {
+    return 'uploadTray.savedPending';
+  }
+  if (video?.processingStatus == 'processing') {
+    return 'uploadTray.savedProcessing';
+  }
+  return null;
+}
 
 IconData _uploadIcon(UploadController controller) => switch (controller.phase) {
   UploadPhase.failed => Icons.error_outline_rounded,
