@@ -171,8 +171,7 @@ public sealed class NotificationService(
                 async token => await ReadPageAsync(userId, page, pageSize, token),
                 new HybridCacheEntryOptions {
                     Expiration = TimeSpan.FromSeconds(30),
-                    // A local copy cannot observe invalidation from another API
-                    // instance. Use shared L2 only for this mutable user state.
+                    // Use only the distributed cache for this mutable user state.
                     Flags = HybridCacheEntryFlags.DisableLocalCache
                 }, cancellationToken: ct);
         }

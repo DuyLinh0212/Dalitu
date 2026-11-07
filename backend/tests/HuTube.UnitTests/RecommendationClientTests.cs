@@ -1,7 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using HuTube.Infrastructure.Recommendations;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HuTube.UnitTests;
@@ -12,7 +13,8 @@ public sealed class RecommendationClientTests
     public async Task UnavailableServiceUsesOneHealthProbeAndSharesCooldownAcrossClients()
     {
         var calls = new List<string>();
-        using var cache = new MemoryCache(new MemoryCacheOptions());
+        using var services = CacheProvider();
+        var cache = services.GetRequiredService<IDistributedCache>();
         using var http = new HttpClient(new Handler((request, _) => {
             calls.Add(request.RequestUri!.AbsolutePath);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadGateway));
@@ -29,7 +31,8 @@ public sealed class RecommendationClientTests
     [InlineData(0)]
     public async Task FeedDeadlineFallsBackWithoutWaitingForTheModelAdminTimeout(int timeoutSeconds)
     {
-        using var cache = new MemoryCache(new MemoryCacheOptions());
+        using var services = CacheProvider();
+        var cache = services.GetRequiredService<IDistributedCache>();
         using var http = new HttpClient(new Handler(async (_, ct) => {
             await Task.Delay(Timeout.Infinite, ct);
             return new HttpResponseMessage(HttpStatusCode.OK);
@@ -44,7 +47,8 @@ public sealed class RecommendationClientTests
     public async Task CallerCancellationPropagatesWithoutOpeningTheCooldown()
     {
         var calls = 0;
-        using var cache = new MemoryCache(new MemoryCacheOptions());
+        using var services = CacheProvider();
+        var cache = services.GetRequiredService<IDistributedCache>();
         using var http = new HttpClient(new Handler((_, ct) => {
             calls++;
             ct.ThrowIfCancellationRequested();
@@ -61,9 +65,16 @@ public sealed class RecommendationClientTests
         Assert.InRange(calls, 1, 2);
     }
 
-    private static RecommendationClient Client(HttpClient http, IMemoryCache cache) =>
+    private static RecommendationClient Client(HttpClient http, IDistributedCache cache) =>
         new(http, new RecommendationOptions { ServiceUrl = "https://recommender.test" },
             NullLogger<RecommendationClient>.Instance, cache);
+
+    private static ServiceProvider CacheProvider()
+    {
+        var services = new ServiceCollection().AddLogging();
+        services.AddDistributedMemoryCache();
+        return services.BuildServiceProvider();
+    }
 
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handle) : HttpMessageHandler
     {

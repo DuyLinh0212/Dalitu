@@ -1,9 +1,9 @@
 using System.Net;
+using System.Text.Json;
 using HuTube.Application.Auth;
 using HuTube.Domain.Users;
 using HuTube.Infrastructure.Authentication;
 using HuTube.Infrastructure.Caching;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -12,52 +12,87 @@ namespace HuTube.UnitTests;
 public sealed class RedisSessionPlayerPreferencesStoreTests
 {
     [Fact]
-    public async Task RedisConnectionLossDuringReadReturnsTheCachedSessionCopy()
+    public async Task RedisReadsPreferencesOnEveryLookupWithoutRamCopy()
     {
-        // Arrange
-        var handler = new RedisDisconnectsAfterWriteHandler();
+        var handler = new PreferencesRedisHandler();
         using var http = new HttpClient(handler);
-        var clients = new FixedHttpClientFactory(http);
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["UPSTASH_REDIS_REST_URL"] = "https://redis.example.test",
-            ["UPSTASH_REDIS_REST_TOKEN"] = "test-token"
-        }).Build();
-        using var memory = new MemoryCache(new MemoryCacheOptions());
-        var store = new RedisSessionPlayerPreferencesStore(
-            new UpstashRedisClient(clients, configuration, TimeProvider.System, NullLogger<UpstashRedisClient>.Instance),
-            memory, NullLogger<RedisSessionPlayerPreferencesStore>.Instance);
+        var store = CreateStore(http, handler.Configuration);
         var session = new UserSession { ExpiresAt = DateTimeOffset.UtcNow.AddHours(1) };
         var expected = new SessionPlayerPreferences(0.35m, true);
 
-        // Act
         await store.SetAsync(session, expected, CancellationToken.None);
         Assert.Equal(expected, await store.GetAsync(session, CancellationToken.None));
-        Assert.Equal(1, handler.RequestCount); // A warm read does not call Redis.
-        memory.Remove($"session-player-preferences:{session.SessionId:N}");
-        var actual = await store.GetAsync(session, CancellationToken.None);
-
-        // Assert
-        Assert.Equal(expected, actual);
-        Assert.Equal(2, handler.RequestCount);
         Assert.Equal(expected, await store.GetAsync(session, CancellationToken.None));
-        Assert.Equal(2, handler.RequestCount); // Redis cooldown also protects fallback reads.
+
+        Assert.Equal(3, handler.RequestCount);
+        Assert.Equal(2, handler.Commands.Count(command => command[0] == "HMGET"));
     }
 
-    private sealed class RedisDisconnectsAfterWriteHandler : HttpMessageHandler
+    [Fact]
+    public async Task RedisFailureUsesDefaultsInsteadOfAProcessLocalCopy()
     {
-        public int RequestCount { get; private set; }
+        var handler = new PreferencesRedisHandler { FailReads = true };
+        using var http = new HttpClient(handler);
+        var store = CreateStore(http, handler.Configuration);
+        var session = new UserSession { ExpiresAt = DateTimeOffset.UtcNow.AddHours(1) };
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        await store.SetAsync(session, new SessionPlayerPreferences(0.35m, true), CancellationToken.None);
+
+        Assert.Null(await store.GetAsync(session, CancellationToken.None));
+        Assert.Null(await store.GetAsync(session, CancellationToken.None));
+        Assert.Equal(2, handler.RequestCount); // Redis cooldown prevents another failing request.
+    }
+
+    [Fact]
+    public async Task MissingRedisConfigurationDoesNotKeepPreferencesInProcessMemory()
+    {
+        var handler = new PreferencesRedisHandler();
+        using var http = new HttpClient(handler);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var store = CreateStore(http, configuration);
+        var session = new UserSession { ExpiresAt = DateTimeOffset.UtcNow.AddHours(1) };
+
+        await store.SetAsync(session, new SessionPlayerPreferences(0.35m, true), CancellationToken.None);
+
+        Assert.Null(await store.GetAsync(session, CancellationToken.None));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    private static RedisSessionPlayerPreferencesStore CreateStore(HttpClient http, IConfiguration configuration) =>
+        new(new UpstashRedisClient(new FixedHttpClientFactory(http), configuration,
+                TimeProvider.System, NullLogger<UpstashRedisClient>.Instance),
+            NullLogger<RedisSessionPlayerPreferencesStore>.Instance);
+
+    private sealed class PreferencesRedisHandler : HttpMessageHandler
+    {
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["UPSTASH_REDIS_REST_URL"] = "https://redis.example.test",
+                ["UPSTASH_REDIS_REST_TOKEN"] = "test-token"
+            }).Build();
+        public bool FailReads { get; init; }
+        public int RequestCount { get; private set; }
+        public List<string[]> Commands { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             RequestCount++;
-            if (RequestCount == 1)
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent("{\"result\":1}", System.Text.Encoding.UTF8, "application/json")
-                });
+            var command = JsonSerializer.Deserialize<string[]>(await request.Content!.ReadAsStringAsync(ct))!;
+            Commands.Add(command);
+            if (FailReads && command[0] == "HMGET")
+                throw new HttpRequestException("Redis disconnected during preference read.");
 
-            throw new HttpRequestException("Redis disconnected after the preference was saved.");
+            object? result = command[0] switch
+            {
+                "EVAL" => 1,
+                "HMGET" => new string?[] { "0.35", "true" },
+                _ => throw new InvalidOperationException(command[0])
+            };
+            return new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new { result }))
+            };
         }
     }
 

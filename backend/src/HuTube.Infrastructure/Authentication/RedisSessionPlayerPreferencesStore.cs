@@ -2,14 +2,13 @@ using System.Globalization;
 using System.Text.Json;
 using HuTube.Application.Auth;
 using HuTube.Domain.Users;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using HuTube.Infrastructure.Caching;
 
 namespace HuTube.Infrastructure.Authentication;
 
 public sealed class RedisSessionPlayerPreferencesStore(
-    UpstashRedisClient redis, IMemoryCache memory,
+    UpstashRedisClient redis,
     ILogger<RedisSessionPlayerPreferencesStore> logger) : ISessionPlayerPreferencesStore
 {
     // HSET changes only audio fields; existing authentication fields remain intact.
@@ -25,40 +24,28 @@ public sealed class RedisSessionPlayerPreferencesStore(
         """;
 
     private static string Key(Guid id) => $"dalitu:auth:session:{id:N}";
-    private static string MemoryKey(Guid id) => $"session-player-preferences:{id:N}";
-    private static string FallbackKey(Guid id) => MemoryKey(id) + ":fallback";
 
     public async Task<SessionPlayerPreferences?> GetAsync(UserSession session, CancellationToken ct)
     {
-        if (memory.TryGetValue(MemoryKey(session.SessionId), out SessionPlayerPreferences? cached)) return cached;
-        if (!redis.Configured) return memory.Get<SessionPlayerPreferences>(FallbackKey(session.SessionId));
+        if (!redis.Configured) return null;
         try
         {
             var result = await CommandAsync(["HMGET", Key(session.SessionId), "volume", "muted"], ct);
             if (result.ValueKind == JsonValueKind.Array && result.GetArrayLength() == 2
                 && decimal.TryParse(result[0].GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var volume)
                 && volume is >= 0m and <= 1m && bool.TryParse(result[1].GetString(), out var muted))
-            {
-                var preferences = new SessionPlayerPreferences(volume, muted);
-                memory.Set(MemoryKey(session.SessionId), preferences, LocalExpiration(session));
-                memory.Set(FallbackKey(session.SessionId), preferences, session.ExpiresAt);
-                return preferences;
-            }
-            memory.Set<SessionPlayerPreferences?>(MemoryKey(session.SessionId), null, TimeSpan.FromSeconds(5));
-            memory.Remove(FallbackKey(session.SessionId));
+                return new SessionPlayerPreferences(volume, muted);
             return null;
         }
         catch (Exception ex) when (Unavailable(ex, ct))
         {
-            logger.LogWarning(ex, "Could not read session player preferences from Redis; using the local session copy.");
-            return memory.Get<SessionPlayerPreferences>(FallbackKey(session.SessionId));
+            logger.LogWarning(ex, "Could not read session player preferences from Redis; using the default player preferences.");
+            return null;
         }
     }
 
     public async Task SetAsync(UserSession session, SessionPlayerPreferences preferences, CancellationToken ct)
     {
-        memory.Set(MemoryKey(session.SessionId), preferences, LocalExpiration(session));
-        memory.Set(FallbackKey(session.SessionId), preferences, session.ExpiresAt);
         if (!redis.Configured) return;
         try
         {
@@ -68,14 +55,12 @@ public sealed class RedisSessionPlayerPreferencesStore(
         }
         catch (Exception ex) when (Unavailable(ex, ct))
         {
-            logger.LogWarning(ex, "Could not save session player preferences in Redis; keeping the local session copy.");
+            logger.LogWarning(ex, "Could not save session player preferences in Redis.");
         }
     }
 
     public async Task RemoveAsync(Guid sessionId, CancellationToken ct)
     {
-        memory.Remove(MemoryKey(sessionId));
-        memory.Remove(FallbackKey(sessionId));
         if (!redis.Configured) return;
         try { await CommandAsync(["EVAL", RemoveScript, "1", Key(sessionId)], ct); }
         catch (Exception ex) when (Unavailable(ex, ct))
@@ -83,9 +68,6 @@ public sealed class RedisSessionPlayerPreferencesStore(
             logger.LogWarning(ex, "Could not clear old player preferences; the Redis key will expire with the session.");
         }
     }
-
-    private DateTimeOffset LocalExpiration(UserSession session) => !redis.Configured ? session.ExpiresAt :
-        session.ExpiresAt < DateTimeOffset.UtcNow.AddSeconds(20) ? session.ExpiresAt : DateTimeOffset.UtcNow.AddSeconds(20);
 
     private Task<JsonElement> CommandAsync(string[] command, CancellationToken ct) => redis.CommandAsync(command, ct);
 

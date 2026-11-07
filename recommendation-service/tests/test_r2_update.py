@@ -98,6 +98,14 @@ def test_r2_training_restart_and_failed_update_keep_active_model(tmp_path, monke
                 break
             time.sleep(.05)
         assert progress["status"] == "completed", progress
+        # The job record is persisted just before the background coroutine exits.
+        # Wait for that final cleanup so the next update is not rejected as busy.
+        assert registry.update_task is not None
+        for _ in range(100):
+            if registry.update_task.done():
+                break
+            time.sleep(.01)
+        assert registry.update_task.done()
         replay = client.post(
             "/internal/model/train",
             headers={"X-Model-Admin-Token": "admin-secret"},

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     ] = "item_based"
     recommender_service_token: str = ""
     recommender_admin_token: str = ""
+    upstash_redis_rest_url: str = ""
+    upstash_redis_rest_token: str = ""
     hutube_api_base_url: HttpUrl = "http://127.0.0.1:5080/api/v1"
     cors_allowed_origins: list[str] = [
         "http://localhost:4200", "http://127.0.0.1:4200",

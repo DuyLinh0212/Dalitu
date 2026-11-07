@@ -34,7 +34,7 @@ packages = ["app", "app.data", "app.recommenders", "training"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
-  "dataset: tests that require the local MovieLens 100K dataset",
+  "dataset: tests that require a local MovieLens dataset",
 ]
 
 [tool.ruff]

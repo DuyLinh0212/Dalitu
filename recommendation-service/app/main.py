@@ -14,6 +14,7 @@ from app.config import Settings, get_settings
 from app.model_registry import ModelRegistry
 from app.public_feed import router as public_feed_router
 from app.r2_store import R2ConfigurationError
+from app.ranking_cache import UpstashRankingCache
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -47,7 +48,13 @@ def create_app(
         logger.info("Starting Recommendation HTTP without waiting for model storage.")
         task = asyncio.create_task(refresh_models())
         async with httpx.AsyncClient(timeout=30) as content_client:
+            ranking_cache = UpstashRankingCache(
+                endpoint=resolved_settings.upstash_redis_rest_url,
+                token=resolved_settings.upstash_redis_rest_token,
+                environment=resolved_settings.app_env,
+            )
             _app.state.content_client = content_client
+            _app.state.ranking_cache = ranking_cache
             try:
                 yield
             finally:
@@ -55,6 +62,7 @@ def create_app(
                 with suppress(asyncio.CancelledError):
                     await task
                 await asyncio.to_thread(resolved_registry.statistics.flush)
+                ranking_cache.close()
 
     app = FastAPI(
         title=resolved_settings.app_name,

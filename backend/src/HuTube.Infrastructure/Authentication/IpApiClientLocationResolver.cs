@@ -1,9 +1,12 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using HuTube.Application.Auth;
-using Microsoft.Extensions.Caching.Memory;
+using HuTube.Infrastructure.Caching;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace HuTube.Infrastructure.Authentication;
@@ -11,13 +14,18 @@ namespace HuTube.Infrastructure.Authentication;
 public sealed class IpApiClientLocationResolver(
     HttpClient http,
     GeoIpOptions options,
-    IMemoryCache cache,
+    UpstashRedisClient redis,
+    IHostEnvironment environment,
     ILogger<IpApiClientLocationResolver> logger) : IClientLocationResolver
 {
+    private const string CacheLifetimeSeconds = "86400";
+    private readonly string cachePrefix = $"dalitu:{environment.EnvironmentName.ToLowerInvariant()}:cache:auth:geoip:v1:";
+
     public async Task<ClientLocation?> ResolveAsync(string? ipAddress, CancellationToken ct = default)
     {
         if (!options.Enabled || !IPAddress.TryParse(ipAddress, out var address) || IsPrivate(address)) return null;
-        if (cache.TryGetValue(CacheKey(ipAddress!), out ClientLocation? cached)) return cached;
+        var cacheKey = CacheKey(ipAddress!);
+        if (redis.Configured && await ReadCachedAsync(cacheKey, ct) is { } cached) return cached;
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromMilliseconds(Math.Clamp(options.TimeoutMilliseconds, 100, 5000)));
@@ -32,7 +40,7 @@ public sealed class IpApiClientLocationResolver(
             var location = new ClientLocation(
                 Clean(payload.CountryCode, 8), Clean(payload.Region, 120), Clean(payload.City, 120),
                 payload.Latitude, payload.Longitude);
-            cache.Set(CacheKey(ipAddress!), location, TimeSpan.FromHours(24));
+            if (redis.Configured) await WriteCachedAsync(cacheKey, location, ct);
             return location;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -57,7 +65,40 @@ public sealed class IpApiClientLocationResolver(
         }
     }
 
-    private static string CacheKey(string ip) => "geoip:" + ip;
+    private string CacheKey(string ip) => cachePrefix
+        + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(ip.Trim())));
+
+    private async Task<ClientLocation?> ReadCachedAsync(string key, CancellationToken ct)
+    {
+        try
+        {
+            var result = await redis.CommandAsync(["GET", key], ct);
+            return result.ValueKind == JsonValueKind.String
+                ? JsonSerializer.Deserialize<ClientLocation>(result.GetString()!)
+                : null;
+        }
+        catch (RedisUnavailableException)
+        {
+            logger.LogDebug("GeoIP Redis cache is unavailable.");
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task WriteCachedAsync(string key, ClientLocation location, CancellationToken ct)
+    {
+        try
+        {
+            await redis.CommandAsync(["SET", key, JsonSerializer.Serialize(location), "EX", CacheLifetimeSeconds], ct);
+        }
+        catch (RedisUnavailableException)
+        {
+            logger.LogDebug("GeoIP Redis cache write failed.");
+        }
+    }
     private static string? Clean(string? value, int max) => string.IsNullOrWhiteSpace(value) ? null : value.Trim()[..Math.Min(value.Trim().Length, max)];
 
     private static bool IsPrivate(IPAddress address)

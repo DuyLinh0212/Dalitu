@@ -41,8 +41,8 @@ public sealed class ReadModelCacheFilter(HuTubeDbContext db, HybridCache cache,
         var scopes = policy.Scopes.Prepend("shared").Concat(privateScopes)
             .Distinct().Order().ToArray();
         // One small indexed query replaces repeated lists/counts/joins. Never
-        // locally cache this revision: a committed revoke/visibility change must
-        // make the old L1 AND L2 result unreachable on every API replica.
+        // cache this revision: a committed revoke/visibility change must make
+        // the old distributed result unreachable on the next request.
         string revision;
         try { revision = await db.Database.SqlQueryRaw<string>("""
             SELECT COALESCE(string_agg(scope || ':' || revision::text, ',' ORDER BY scope), '') AS "Value"
@@ -65,7 +65,7 @@ public sealed class ReadModelCacheFilter(HuTubeDbContext db, HybridCache cache,
         var key = $"read:v1:{(policy.Shared ? "public" : actor)}:{Hash(revision)}:{Hash(dimension)}";
         var lifetime = new HybridCacheEntryOptions {
             Expiration = TimeSpan.FromSeconds(policy.Seconds + Random.Shared.Next(0, Math.Max(1, policy.Seconds / 10))),
-            LocalCacheExpiration = TimeSpan.FromSeconds(Math.Min(5, policy.Seconds))
+            Flags = HybridCacheEntryFlags.DisableLocalCache
         };
         string? payload = null;
         try
@@ -74,7 +74,8 @@ public sealed class ReadModelCacheFilter(HuTubeDbContext db, HybridCache cache,
             // own a request-scoped DbContext and cancellation lifetime. On miss,
             // execute this request normally and publish only a completed DTO.
             payload = await cache.GetOrCreateAsync<string?>(key, _ => ValueTask.FromResult<string?>(null),
-                new HybridCacheEntryOptions { Flags = HybridCacheEntryFlags.DisableLocalCacheWrite | HybridCacheEntryFlags.DisableDistributedCacheWrite },
+                new HybridCacheEntryOptions { Flags = HybridCacheEntryFlags.DisableLocalCache
+                    | HybridCacheEntryFlags.DisableLocalCacheWrite | HybridCacheEntryFlags.DisableDistributedCacheWrite },
                 cancellationToken: request.HttpContext.RequestAborted);
         }
         catch (Exception exception) when (!request.HttpContext.RequestAborted.IsCancellationRequested)

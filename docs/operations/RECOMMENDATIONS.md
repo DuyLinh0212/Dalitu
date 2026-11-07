@@ -23,6 +23,12 @@ Trong phần mô phỏng, có thể chọn nhiều danh mục và chia tỷ lệ
 
 Chi tiết nguyên lý, payload và từng bước xử lý nằm trong [BOT_SIMULATION.md](BOT_SIMULATION.md).
 
+## Cache ranking trên Upstash
+
+Recommendation Service có thể dùng cùng Upstash Redis làm cache phân tán cho danh sách video ID đã xếp hạng. Key gồm model version, user và danh sách loại trừ đã chuẩn hóa; phần định danh được băm trước khi lưu. TTL là 30 giây. Service không giữ bản sao ranking trong RAM.
+
+Đặt `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN` trong môi trường Recommendation Service. Local launcher nhận các biến đã nạp vào process hoặc từ `recommendation-service/.env`; Docker EC2 nạp chúng từ `recommendation-service/.env.ec2`; Render nhận chúng trong Environment của service Python. Nếu thiếu cấu hình hoặc Redis lỗi, cache được bỏ qua và model tính ranking lại.
+
 ## Render Free
 
 `render.yaml` khai báo `hutube-recommendation-service` dạng public Docker web miễn phí. Điền cùng cặp token và R2 credentials cho hai service trong Render; đặt `Recommendation__ServiceUrl` trên API thành URL HTTPS của service Python. Giữ token trong biến môi trường, không trong web config. API và Python phải dùng chung bucket R2. R2 API token của API cần quyền đọc/ghi/xóa object và liệt kê object trong bucket để sweep CSV cũ. [Render Free](https://render.com/docs/free) có 512 MB RAM, 0,1 CPU, ngủ sau 15 phút không có request và file cục bộ không bền; vì vậy artifact chỉ được lưu trên R2. Request đầu sau khi service ngủ có thể dùng feed mặc định. [R2 S3 API](https://developers.cloudflare.com/r2/get-started/s3/) cần endpoint account và region `auto`.

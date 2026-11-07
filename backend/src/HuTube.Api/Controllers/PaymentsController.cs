@@ -3,13 +3,14 @@ using System.Text;
 using System.Text.Json;
 using HuTube.Application.Payments;
 using HuTube.Application.Rbac;
+using HuTube.Infrastructure.Caching;
 using HuTube.Infrastructure.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace HuTube.Api.Controllers;
 
@@ -18,7 +19,8 @@ namespace HuTube.Api.Controllers;
 public sealed class PaymentsController(
     IPaymentService paymentService,
     IServiceScopeFactory scopeFactory,
-    IMemoryCache memoryCache,
+    UpstashRedisClient redis,
+    IHostEnvironment environment,
     SepaySignatureVerifier signatureVerifier,
     ILogger<PaymentsController> logger) : ControllerBase
 {
@@ -90,11 +92,8 @@ public sealed class PaymentsController(
         if (!signatureVerifier.Verify(rawBytes, signature, timestamp))
         {
             logger.LogWarning("SePay webhook signature verification failed.");
-            if (!memoryCache.TryGetValue("sepay-invalid-signature-audit-sample", out _))
-            {
-                memoryCache.Set("sepay-invalid-signature-audit-sample", true, TimeSpan.FromMinutes(1));
+            if (await TryRecordInvalidSignatureSampleAsync(ct))
                 await RecordWebhookEventAsync("payment.sepay_webhook.rejected", "Chữ ký webhook SePay không hợp lệ.", ct);
-            }
             return Unauthorized(new { success = false, message = "Invalid signature." });
         }
 
@@ -150,6 +149,23 @@ public sealed class PaymentsController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Could not persist SePay webhook history for action {Action}.", action);
+        }
+    }
+
+    private async Task<bool> TryRecordInvalidSignatureSampleAsync(CancellationToken ct)
+    {
+        if (!redis.Configured) return true;
+        var key = $"dalitu:{environment.EnvironmentName.ToLowerInvariant()}:cache:payments:sepay-invalid-signature:v1";
+        try
+        {
+            var result = await redis.CommandAsync(["SET", key, "1", "NX", "EX", "60"], ct);
+            return result.ValueKind == System.Text.Json.JsonValueKind.String
+                && string.Equals(result.GetString(), "OK", StringComparison.Ordinal);
+        }
+        catch (RedisUnavailableException)
+        {
+            logger.LogDebug("Redis cache unavailable while sampling invalid payment webhook signatures.");
+            return true;
         }
     }
 }

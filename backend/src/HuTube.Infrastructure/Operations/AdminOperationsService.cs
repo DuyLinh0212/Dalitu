@@ -13,10 +13,10 @@ using HuTube.Infrastructure.Persistence;
 using HuTube.Infrastructure.Notifications;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace HuTube.Infrastructure.Operations;
 
@@ -28,8 +28,8 @@ public sealed class AdminOperationsService(
     NotificationConnections notificationConnections,
     IObjectStorage objectStorage,
     IHttpClientFactory httpClientFactory,
-    IMemoryCache memoryCache,
-    IHttpContextAccessor httpContextAccessor, HybridCache? readCache = null)
+    IHttpContextAccessor httpContextAccessor, ILogger<AdminOperationsService> logger,
+    HybridCache? readCache = null)
 {
     private static readonly TimeSpan HealthProbeTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ProviderMetricsTimeout = TimeSpan.FromSeconds(10);
@@ -47,7 +47,8 @@ public sealed class AdminOperationsService(
         ? QueryCountersAsync(now, ct)
         : readCache.GetOrCreateAsync($"operations:counters:v1:{now.ToUnixTimeSeconds() / 15}",
             token => new ValueTask<CounterSnapshot>(QueryCountersAsync(now, token)),
-            new HybridCacheEntryOptions { Expiration = TimeSpan.FromSeconds(15), LocalCacheExpiration = TimeSpan.FromSeconds(5) },
+            new HybridCacheEntryOptions { Expiration = TimeSpan.FromSeconds(15),
+                Flags = HybridCacheEntryFlags.DisableLocalCache },
             cancellationToken: ct).AsTask();
 
     private Task<CounterSnapshot> QueryCountersAsync(DateTimeOffset now, CancellationToken ct) =>
@@ -66,6 +67,28 @@ public sealed class AdminOperationsService(
                 (SELECT count(*) FROM public.video_renditions WHERE status = 'processing') AS "ProcessingRenditions",
                 (SELECT count(*) FROM public.video_renditions WHERE status = 'failed' AND updated_at >= {now.AddDays(-1)} AND updated_at < {now}) AS "FailedRenditions"
             """).SingleAsync(ct);
+
+    private async Task<T> GetL2Async<T>(string key, TimeSpan expiration,
+        Func<CancellationToken, Task<T>> factory, CancellationToken ct) where T : class
+    {
+        if (readCache is null) return await factory(ct);
+        try
+        {
+            return await readCache.GetOrCreateAsync(key,
+                token => new ValueTask<T>(factory(token)),
+                new HybridCacheEntryOptions {
+                    Expiration = expiration,
+                    Flags = HybridCacheEntryFlags.DisableLocalCache
+                },
+                cancellationToken: ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Redis cache unavailable for admin provider usage key {CacheKey}; querying provider.", key);
+            return await factory(ct);
+        }
+    }
 
     public async Task<AdminSystemOverviewResponse> GetSystemOverviewAsync(CancellationToken ct)
     {
@@ -390,12 +413,8 @@ public sealed class AdminOperationsService(
                 "Chưa cấu hình CLOUDFLARE_API_TOKEN có quyền Account Analytics: Read.");
 
         var cacheKey = $"admin-r2-storage-usage:{accountId}:{bucketName}";
-        return await memoryCache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = R2UsageCacheDuration;
-            return await QueryR2StorageUsageAsync(accountId, bucketName, token, ct);
-        }) ?? new AdminR2StorageUsage("error", bucketName, null, null, null, null, null, null,
-            "Không lấy được số liệu Cloudflare R2.");
+        return await GetL2Async(cacheKey, R2UsageCacheDuration,
+            cacheCt => QueryR2StorageUsageAsync(accountId, bucketName, token, cacheCt), ct);
     }
 
     private async Task<AdminR2StorageUsage> QueryR2StorageUsageAsync(
@@ -549,11 +568,8 @@ public sealed class AdminOperationsService(
                 "Đã đo dung lượng database và kết nối từ PostgreSQL; usage CU tháng này cần NEON_API_KEY, NEON_ORG_ID và NEON_PROJECT_ID.");
 
         var cacheKey = $"admin-neon-usage:{orgId}:{projectId}";
-        var consumption = await memoryCache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = NeonUsageCacheDuration;
-            return await QueryNeonConsumptionAsync(apiKey, orgId, projectId, ct);
-        });
+        var consumption = await GetL2Async(cacheKey, NeonUsageCacheDuration,
+            token => QueryNeonConsumptionAsync(apiKey, orgId, projectId, token), ct);
 
         return new(consumption?.Status ?? "error", databaseSizeBytes, activeConnections, connectionLimit,
             consumption?.ComputeUnitHours,
@@ -652,11 +668,8 @@ public sealed class AdminOperationsService(
                 "Health check Redis đã dùng REST URL/token; quota yêu cầu UPSTASH_EMAIL, UPSTASH_API_KEY và UPSTASH_REDIS_DATABASE_ID.");
 
         var cacheKey = $"admin-upstash-usage:{databaseId}";
-        return await memoryCache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = UpstashUsageCacheDuration;
-            return await QueryUpstashUsageAsync(email, apiKey, databaseId, ct);
-        }) ?? new AdminRedisUsage("error", "", null, null, null, null, "", "Không lấy được usage từ Upstash Developer API.");
+        return await GetL2Async(cacheKey, UpstashUsageCacheDuration,
+            token => QueryUpstashUsageAsync(email, apiKey, databaseId, token), ct);
     }
 
     private async Task<AdminRedisUsage> QueryUpstashUsageAsync(

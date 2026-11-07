@@ -123,7 +123,7 @@ public sealed class LivePlannedTests(LivePlannedFixture f) : IClassFixture<LiveP
     [LivePlannedFact]
     public async Task B_CACHE_14_TwoRealKestrelHosts_ShareRedisAndRejectRevokedSession()
     {
-        // Independent Kestrel hosts: no shared L1 cache or DI provider.
+        // Independent Kestrel hosts share only Redis; their DI providers are separate.
         using var a = LivePlannedFixture.Authorized(f.A, f.Tokens[1]);
         using var b = LivePlannedFixture.Authorized(f.B, f.Tokens[1]);
         await f.A.Services.GetRequiredService<HybridCache>().RemoveAsync($"notifications:{f.Users[1]:N}:recent");
@@ -135,8 +135,7 @@ public sealed class LivePlannedTests(LivePlannedFixture f) : IClassFixture<LiveP
         var unread = first.Items.First(x => !x.IsRead);
         (await a.PatchAsync($"/api/v1/notifications/{unread.NotificationId}/read", null)).EnsureSuccessStatusCode();
         var immediate = (await b.GetFromJsonAsync<NotificationPage>("/api/v1/notifications"))!;
-        await Task.Delay(5500);
-        var recovered = (await b.GetFromJsonAsync<NotificationPage>("/api/v1/notifications"))!;
+        var repeated = (await b.GetFromJsonAsync<NotificationPage>("/api/v1/notifications"))!;
         using var otherUser = LivePlannedFixture.Authorized(f.B, f.Tokens[2]);
         var isolated = (await otherUser.GetFromJsonAsync<NotificationPage>("/api/v1/notifications"))!;
         // A dedicated new session is revoked without breaking the other test fixtures.
@@ -151,12 +150,12 @@ public sealed class LivePlannedTests(LivePlannedFixture f) : IClassFixture<LiveP
         var freshNow = immediate.Items.Single(x => x.NotificationId == unread.NotificationId).IsRead;
         f.Record("B-CACHE.14", new { hosts = new[] { a.BaseAddress!.ToString(), b.BaseAddress!.ToString() }, sharedRead,
             sameTotal = first.Total == other.Total, immediateInvalidation = freshNow,
-            afterLocalTtl = recovered.Items.Single(x => x.NotificationId == unread.NotificationId).IsRead,
+            repeatedRead = repeated.Items.Single(x => x.NotificationId == unread.NotificationId).IsRead,
             isolatedTotal = isolated.Total, beforeLogout = (int)allowed.StatusCode, afterLogout = (int)denied.StatusCode });
         Assert.True(sharedRead > 0); Assert.Equal(first.Total, other.Total); Assert.Equal(0, isolated.Total);
-        Assert.True(recovered.Items.Single(x => x.NotificationId == unread.NotificationId).IsRead);
+        Assert.True(repeated.Items.Single(x => x.NotificationId == unread.NotificationId).IsRead);
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode); Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
-        Assert.True(freshNow, "Instance B served a stale notification from L1 after instance A invalidated the shared Redis entry.");
+        Assert.True(freshNow, "Instance B served a stale notification after instance A invalidated the shared Redis entry.");
     }
 
     [LivePlannedFact]

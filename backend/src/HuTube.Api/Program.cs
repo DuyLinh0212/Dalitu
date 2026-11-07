@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using HuTube.Api.Middleware;
 using HuTube.Api.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Caching.Hybrid;
 using HuTube.Api.Services;
 using HuTube.Application.Account;
 using HuTube.Application.Auth;
@@ -101,7 +102,8 @@ builder.Services.AddHttpClient("redis-rest", client => client.Timeout = TimeSpan
 builder.Services.AddSingleton<UpstashRedisClient>();
 builder.Services.AddHybridCache(options => {
     options.DefaultEntryOptions = new() {
-        Expiration = TimeSpan.FromSeconds(30), LocalCacheExpiration = TimeSpan.FromSeconds(5)
+        Expiration = TimeSpan.FromSeconds(30),
+        Flags = HybridCacheEntryFlags.DisableLocalCache
     };
 });
 if (UpstashRedisClient.IsConfigured(builder.Configuration))
@@ -207,7 +209,6 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<NotificationConnections>();
 builder.Services.AddHostedService<NotificationSessionMonitor>();
 builder.Services.AddHttpClient();
-builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IClientLocationResolver, IpApiClientLocationResolver>(client =>
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Dalitu/1.0 (IP geolocation for login security)"));
 builder.Services.AddHttpClient<IRecommendationClient, RecommendationClient>();

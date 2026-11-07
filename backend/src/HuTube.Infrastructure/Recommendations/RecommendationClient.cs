@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using HuTube.Application.Recommendations;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
 namespace HuTube.Infrastructure.Recommendations;
@@ -21,7 +21,7 @@ public sealed class RecommendationClient : IRecommendationClient
     private readonly HttpClient _http;
     private readonly RecommendationOptions _options;
     private readonly ILogger<RecommendationClient> _logger;
-    private readonly IMemoryCache _cache;
+    private readonly IDistributedCache? _cache;
     private readonly string _cooldownKey;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -32,7 +32,7 @@ public sealed class RecommendationClient : IRecommendationClient
         HttpClient http,
         RecommendationOptions options,
         ILogger<RecommendationClient> logger,
-        IMemoryCache cache)
+        IDistributedCache? cache = null)
     {
         _http = http;
         _options = options;
@@ -56,7 +56,7 @@ public sealed class RecommendationClient : IRecommendationClient
         IReadOnlyList<Guid>? excludeVideoIds = null,
         CancellationToken ct = default)
     {
-        if (!IsEnabled || _cache.TryGetValue(_cooldownKey, out _))
+        if (!IsEnabled || await IsCoolingDownAsync(ct))
         {
             return null;
         }
@@ -126,7 +126,7 @@ public sealed class RecommendationClient : IRecommendationClient
                     // the inference request instead of repeatedly POSTing into the 502.
                     if (retryAttempt++ > 0 || !await WaitForServiceHealthAsync(timeoutCts.Token))
                     {
-                        MarkUnavailable();
+                        await MarkUnavailableAsync(ct);
                         return null;
                     }
 
@@ -146,26 +146,26 @@ public sealed class RecommendationClient : IRecommendationClient
 
                 if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
                 {
-                    MarkUnavailable();
+                    await MarkUnavailableAsync(ct);
                     _logger.LogWarning("CF recommendation service model is not ready (503): {Error}. Falling back to default feed.", errBody);
                     return null;
                 }
 
                 _logger.LogWarning("CF recommendation service returned HTTP {StatusCode}: {Error}. Falling back.", response.StatusCode, errBody);
-                MarkUnavailable();
+                await MarkUnavailableAsync(ct);
                 return null;
             }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            MarkUnavailable();
+            await MarkUnavailableAsync(ct);
             _logger.LogWarning("CF recommendation service call timed out after {Timeout}s. Falling back to default feed.", FeedTimeout.TotalSeconds);
             return null;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            MarkUnavailable();
+            await MarkUnavailableAsync(ct);
             _logger.LogWarning(ex, "Failed to call CF recommendation service. Falling back to default feed.");
             return null;
         }
@@ -175,7 +175,33 @@ public sealed class RecommendationClient : IRecommendationClient
         RecommendationWakeupPolicy.GetTimeout(_options.TimeoutSeconds).TotalSeconds,
         Math.Clamp(_options.FeedTimeoutSeconds, 1, 15)));
 
-    private void MarkUnavailable() => _cache.Set(_cooldownKey, true, TimeSpan.FromSeconds(30));
+    private async Task<bool> IsCoolingDownAsync(CancellationToken ct)
+    {
+        if (_cache is null) return false;
+        try { return await _cache.GetAsync(_cooldownKey, ct) is not null; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not read the recommendation cooldown from Redis.");
+            return false;
+        }
+    }
+
+    private async Task MarkUnavailableAsync(CancellationToken ct)
+    {
+        if (_cache is null) return;
+        try
+        {
+            await _cache.SetAsync(_cooldownKey, [1], new DistributedCacheEntryOptions {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30)
+            }, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not write the recommendation cooldown to Redis.");
+        }
+    }
 
     private async Task<bool> WaitForServiceHealthAsync(CancellationToken ct)
     {

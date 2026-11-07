@@ -32,7 +32,7 @@ public sealed class RedisCacheTests
     }
 
     [Fact]
-    public async Task HybridCacheSharesRedisAcrossInstancesAndRemovesBothLayers()
+    public async Task HybridCacheUsesRedisForEveryLookupAcrossInstances()
     {
         var handler = new RedisHandler();
         var clock = new TestClock();
@@ -46,6 +46,7 @@ public sealed class RedisCacheTests
         Assert.Equal("from-db", await cache1.GetOrCreateAsync("user:a", Source));
         Assert.Equal("from-db", await cache2.GetOrCreateAsync("user:a", Source));
         Assert.Equal(1, reads);
+        Assert.Equal(3, handler.Commands.Count(c => c[0] == "GET" && c[1] == "test:cache:user:a"));
         var write = Assert.Single(handler.Commands, c => c[0] == "SET");
         Assert.Equal("test:cache:user:a", write[1]);
         Assert.Equal("PX", write[3]);
@@ -53,6 +54,7 @@ public sealed class RedisCacheTests
         await cache1.RemoveAsync("user:a");
         Assert.Equal("from-db", await cache1.GetOrCreateAsync("user:a", Source));
         Assert.Equal(2, reads);
+        Assert.Equal(4, handler.Commands.Count(c => c[0] == "GET" && c[1] == "test:cache:user:a"));
         Assert.Contains(handler.Commands, c => c[0] == "DEL" && c[1] == "test:cache:user:a");
     }
 
@@ -91,7 +93,8 @@ public sealed class RedisCacheTests
         var services = new ServiceCollection().AddLogging();
         services.AddSingleton<IDistributedCache>(new UpstashDistributedCache(Client(handler, clock), "test:cache:", clock));
         services.AddHybridCache(options => options.DefaultEntryOptions = new() {
-            Expiration = TimeSpan.FromSeconds(30), LocalCacheExpiration = TimeSpan.FromSeconds(5)
+            Expiration = TimeSpan.FromSeconds(30),
+            Flags = HybridCacheEntryFlags.DisableLocalCache
         });
         return services.BuildServiceProvider();
     }

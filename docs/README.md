@@ -1,40 +1,48 @@
-# HuTube - Technical Documentation
+# Tài liệu Dalitu
 
-Bộ tài liệu kỹ thuật HuTube hiện được tách thành các phần riêng:
+Trang này là bản đồ tài liệu trong repository. Tổng quan sản phẩm và cách chạy nhanh nằm ở [README gốc](../README.md).
 
-1. [TECH_STACK.md](./TECH_STACK.md)  
-   Công nghệ sử dụng cho Backend, Frontend, Database, Storage, Authentication, Notification và Payment.
+## Tổng quan
 
-2. [PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md)  
-   Kiến trúc tổng thể, Clean Architecture, Modular Monolith, cấu trúc Backend/Frontend và dependency rule.
+- [Tổng quan sản phẩm](PRODUCT.md)
+- [Stack công nghệ](architecture/TECH_STACK.md)
+- [Kiến trúc hệ thống](architecture/PROJECT_ARCHITECTURE.md)
+- [Kiến trúc Collaborative Filtering](architecture/CF_ARCHITECTURE.md)
+- [Quy ước phát triển](conventions/DEVELOPMENT_CONVENTIONS.md)
 
-3. [DEVELOPMENT_CONVENTIONS.md](./DEVELOPMENT_CONVENTIONS.md)  
-   Quy định đặt tên Backend, Frontend, function, file, branch, commit, API và test.
+## Tính năng và thiết kế
 
-4. [DATABASE_CHANGE_MANAGEMENT.md](./DATABASE_CHANGE_MANAGEMENT.md)  
-   Quy định migration, database update, seed, script, rollback và quy trình thay đổi Database.
+- [Module người dùng](features/Module_NguoiDung.md)
+- [Module quản trị](features/Module_QuanTri.md)
+- [Module Collaborative Filtering](features/Module_CF.md)
+- [Chính sách và kiểm duyệt](features/HuTube_Policy_Moderation.md)
+- [Moderation và RabbitMQ](features/Moderation_RabbitMQ.md)
+- [Design system](design/design.md)
 
-5. [BUG.md](./BUG.md)  
-   Báo cáo và danh sách các lỗi đã phát hiện trong dự án.
+## API và dữ liệu
 
-6. [CHANGELOG.md](./CHANGELOG.md)  
-   Lịch sử thay đổi của dự án.
+- [Auth/session API](api/S4_AUTH.md) · [RBAC API](api/S4_RBAC.md)
+- [Quy trình thay đổi database](database/DATABASE_CHANGE_MANAGEMENT.md) · [Ràng buộc dữ liệu](database/HuTube_RangBuoc.md)
+- [Quyết định PostgreSQL local](decisions/ADR-008-postgresql-and-local-s4.md)
 
-7. [PRODUCT.md](./PRODUCT.md)  
-   Mô tả sản phẩm và phạm vi chức năng.
+## Kiểm thử
 
-Các tài liệu này có thể đặt trong:
+- [Kịch bản backend](BACKEND_TEST_SCENARIOS.md) · [Kịch bản Web](WEB_TEST_SCENARIOS.md)
+- [Ma trận RBAC](testing/Admin_RBAC_Matrix.md)
+- [Tiến độ E2E Web](WEB_E2E_PROGRESS.md) · [Báo cáo hiệu năng Admin](testing/Admin_Performance_Review_20261025.md)
+- [Tài liệu lỗi và xử lý](BUG.md) · [Tiến độ xử lý lỗi](bug-fix-progress.md)
 
-```text
-docs/
-├── TECH_STACK.md
-├── PROJECT_ARCHITECTURE.md
-├── DEVELOPMENT_CONVENTIONS.md
-├── DATABASE_CHANGE_MANAGEMENT.md
-├── BUG.md
-├── CHANGELOG.md
-└── PRODUCT.md
-```
+## Vận hành
 
-hoặc phân sâu hơn sau này nếu lượng tài liệu tăng.
+- [Chạy local](operations/LOCAL_DEVELOPMENT.md) · [PostgreSQL local](operations/LOCAL_SETUP.md)
+- [Cache Redis L2](operations/REDIS_READ_CACHE.md) · [Player preferences](operations/SESSION_PLAYER_PREFERENCES.md)
+- [Recommendation](operations/RECOMMENDATIONS.md) · [Thống kê model](operations/MODEL_STATISTICS.md)
+- [Tải và xử lý video](operations/VIDEO_UPLOADS.md) · [Giám sát hệ thống](operations/SYSTEM_MONITORING.md)
+- [CI/CD](operations/CI_CD.md) · [Tự động deploy EC2](operations/EC2_AUTO_DEPLOY.md)
+- [SePay](operations/SEPAY.md) · [Mô phỏng bot](operations/BOT_SIMULATION.md)
 
+## Quy ước đọc
+
+- `features/` và `architecture/` mô tả nghiệp vụ và thiết kế. README gốc cùng mã nguồn là điểm tham chiếu cho cách chạy hiện tại.
+- Scenario là danh mục cần kiểm tra; trạng thái PASS chỉ có giá trị trong phạm vi, ngày chạy và bằng chứng được ghi trong tài liệu.
+- Báo cáo có ngày là ảnh chụp của lần kiểm tra đó, không tự động đại diện cho trạng thái hiện tại của code.

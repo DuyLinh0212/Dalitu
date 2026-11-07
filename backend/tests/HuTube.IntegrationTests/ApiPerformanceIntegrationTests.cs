@@ -61,14 +61,13 @@ public sealed class ApiPerformanceIntegrationTests(ITestOutputHelper output)
         }
 
         // The detail route has no search/feed limiter. Reuse these exact 100
-        // cache keys after L1 expires so the measured hit group exercises L2.
+        // cache keys so the second group measures Redis cache hits.
         var cacheUrls = Enumerable.Range(0, RequestCount)
             .Select(i => $"videos/{videoId}?benchRun={runId}-cache-pair-{i}")
             .ToArray();
         var cacheMiss = await MeasureAsync(client, "Chi tiết video — cache miss",
             i => cacheUrls[i], RequestCount, batchInterval: null);
-        await Task.Delay(TimeSpan.FromSeconds(6));
-        var cacheHit = await MeasureAsync(client, "Chi tiết video — cache hit sau L1 expiry",
+        var cacheHit = await MeasureAsync(client, "Chi tiết video — Redis cache hit",
             i => cacheUrls[i], RequestCount, batchInterval: null);
 
         var finishedAt = DateTimeOffset.UtcNow;
@@ -86,7 +85,6 @@ public sealed class ApiPerformanceIntegrationTests(ITestOutputHelper output)
                 Endpoint: "GET videos/{id}",
                 Miss: cacheMiss,
                 Hit: cacheHit,
-                L1ExpiryWaitSeconds: 6,
                 MeanReductionPercent: ReductionPercent(cacheMiss.AverageMs, cacheHit.AverageMs),
                 P95ReductionPercent: ReductionPercent(cacheMiss.P95Ms, cacheHit.P95Ms)));
 
@@ -230,7 +228,6 @@ public sealed class ApiPerformanceIntegrationTests(ITestOutputHelper output)
         string Endpoint,
         ApiEndpointMeasurement Miss,
         ApiEndpointMeasurement Hit,
-        int L1ExpiryWaitSeconds,
         double? MeanReductionPercent,
         double? P95ReductionPercent);
 

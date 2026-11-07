@@ -34,6 +34,13 @@ Ma trận user-item X
 `train` là bước rebuild offline: tính similarity, lưu artifact và ghi lại thời
 gian fit của từng biến thể. Request FastAPI chỉ load artifact và ranking.
 
+Feed trực tiếp lấy context đã xác thực từ API .NET, sau đó Recommendation Service
+xếp hạng ID video. Kết quả ranking có thể dùng Upstash Redis làm L2 trong 30 giây,
+được phân theo model version, user và danh sách video loại trừ. Service không giữ
+bản sao ranking trong RAM; nếu Redis lỗi hoặc chưa cấu hình, model tính lại. Đặt
+`UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN` trong môi trường của Python
+service để bật cache này.
+
 ## Công thức chính
 
 ### Cosine similarity
@@ -156,7 +163,43 @@ Hướng tối ưu tiếp theo:
 1. Sparse co-occurrence hoặc inverted index để bỏ qua cặp không giao nhau.
 2. Min-overlap threshold để loại similarity sinh từ quá ít quan sát.
 3. Lưu top-neighbor sparse thay vì full similarity khi quy mô catalog tăng.
-4. Cache score hoặc candidate set cho user hoạt động thường xuyên.
+4. Đo tải và tỷ lệ hit của cache ranking ID dùng Upstash Redis (TTL 30 giây), không giữ bản sao trong RAM tiến trình.
+
+### Benchmark cập nhật batch với MovieLens 1M
+
+MovieLens 1M được GroupLens phân phối dưới dạng `ratings.dat` và `movies.dat`;
+loader hỗ trợ trực tiếp định dạng `::` của hai file này. Dữ liệu tải về nằm trong
+`data/raw/` (đã được gitignore) vì giấy phép yêu cầu không phân phối lại dataset.
+
+Tải và giải nén từ [GroupLens MovieLens 1M](https://files.grouplens.org/datasets/movielens/ml-1m.zip):
+
+```powershell
+$datasetRoot = "data/raw/movielens"
+New-Item -ItemType Directory -Force -Path $datasetRoot | Out-Null
+Invoke-WebRequest `
+  -Uri "https://files.grouplens.org/datasets/movielens/ml-1m.zip" `
+  -OutFile "$datasetRoot/ml-1m.zip"
+Expand-Archive -LiteralPath "$datasetRoot/ml-1m.zip" -DestinationPath $datasetRoot -Force
+Remove-Item -LiteralPath "$datasetRoot/ml-1m.zip"
+```
+
+Chạy benchmark để có cả mốc 100.000 và 500.000 ratings. Split 50/50 cung cấp đủ
+ratings mới cho mốc 500.000:
+
+```powershell
+.\.venv\Scripts\python.exe training/benchmark_incremental_item_cf.py `
+  --dataset ml1m `
+  --train-fraction 0.5 `
+  --repeats 1 `
+  --max-batch-size 500000
+```
+
+Report gồm runtime, ước tính bộ nhớ, sai số similarity và mức khớp Top-K; batch
+được lấy cộng dồn từ cùng chronological split. Có thể bỏ `--max-batch-size` để
+đo toàn bộ incoming partition. Kết quả được lưu trong thư mục
+`reports/item_cf_update_comparison_ml1m_<timestamp>/`.
+MovieLens 1M hiện được hỗ trợ trong benchmark incremental; lệnh
+`training.cli train` vẫn dùng cấu hình MovieLens 100K hiện có.
 
 ## Cấu trúc chính
 
@@ -291,5 +334,5 @@ logger của Uvicorn và trả `MODEL_SERVICE_ERROR` thay cho response 500 rỗn
 ## Giới hạn và Hướng phát triển tiếp theo
 
 - Đã tích hợp hoàn tất HttpClient với Backend .NET và bảng tin Trang chủ.
-- Hiện hỗ trợ cả tập dữ liệu MovieLens 100K benchmark lẫn dữ liệu tương tác thực tế / mô phỏng của HuTube.
+- Benchmark cập nhật incremental hỗ trợ MovieLens 100K và 1M; pipeline huấn luyện dùng cấu hình MovieLens 100K hoặc dữ liệu tương tác HuTube.
 - Hướng phát triển tiếp theo: Hybrid Recommendation kết hợp giữa Collaborative Filtering (CF) và Content-Based Filtering (dựa trên thể loại, tag, mô tả video).
