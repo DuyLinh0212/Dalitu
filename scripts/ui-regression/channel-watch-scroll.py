@@ -6,7 +6,7 @@ from pathlib import Path
 import threading
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, expect, sync_playwright
 
 parser = argparse.ArgumentParser(description='Verify channel and watch infinite scroll with isolated APIs')
 parser.add_argument('--root', type=Path, required=True)
@@ -103,18 +103,35 @@ try:
             tabs = page.locator('.recommendation-filters button')
             cards = page.locator('.recommendation-card')
             page.wait_for_function('() => document.querySelectorAll(".recommendation-card").length >= 19', timeout=10000)
-            page.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
-            page.wait_for_function('() => document.querySelectorAll(".recommendation-card").length >= 39', timeout=10000)
+
+            def wait_for_recommendation_count(target):
+                for attempt in range(4):
+                    page.evaluate("""() => {
+                        const sentinel = document.querySelector('.recommendation-sentinel');
+                        if (sentinel) sentinel.scrollIntoView({block: 'end'});
+                        else window.scrollTo(0, document.documentElement.scrollHeight);
+                    }""")
+                    try:
+                        page.wait_for_function(
+                            '(target) => document.querySelectorAll(".recommendation-card").length >= target',
+                            arg=target,
+                            timeout=5000,
+                        )
+                        return
+                    except PlaywrightTimeoutError:
+                        if page.locator('.recommendation-card').count() >= target:
+                            return
+                        if attempt == 3:
+                            raise
+
+            wait_for_recommendation_count(39)
             tabs.nth(1).click()
             page.wait_for_function('() => document.querySelectorAll(".recommendation-card").length >= 19', timeout=10000)
-            page.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
-            page.wait_for_function('() => document.querySelectorAll(".recommendation-card").length >= 39', timeout=10000)
-            page.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
-            page.wait_for_function('() => document.querySelectorAll(".recommendation-card").length >= 44', timeout=10000)
+            wait_for_recommendation_count(39)
+            wait_for_recommendation_count(44)
             # Once tagged videos are exhausted, continue through the category without duplicates.
             for target in [59, 74]:
-                page.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
-                page.wait_for_function('(target) => document.querySelectorAll(".recommendation-card").length >= target', arg=target, timeout=10000)
+                wait_for_recommendation_count(target)
             expect(page.locator('.recommendation-sentinel')).to_have_count(0)
             links = cards.evaluate_all('(items) => items.map(item => item.getAttribute("href"))')
             assert len(links) == len(set(links)) == 74 and '/watch/'+CURRENT not in links
