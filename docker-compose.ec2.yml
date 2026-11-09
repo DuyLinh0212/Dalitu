@@ -27,6 +27,15 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ap-southeast-1
+        awslogs-group: /hutube/ec2/api
+        awslogs-stream: hutube-api
+        awslogs-create-group: "true"
+        mode: non-blocking
+        max-buffer-size: 4m
 
   rabbitmq:
     image: rabbitmq:4.3.6-management
