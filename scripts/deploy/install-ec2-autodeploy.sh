@@ -29,7 +29,7 @@ import os
 import sys
 from pathlib import Path
 config = {
-    "repository": "DuyLinh0212/HuTube",
+    "repository": "DuyLinh0212/Dalitu",
     "repo_dir": sys.argv[1], "run_user": sys.argv[2],
     "project_name": "hutube-ec2", "state_dir": "/var/lib/dalitu-autodeploy",
     "api_url": "http://127.0.0.1:5080",
@@ -45,6 +45,50 @@ with os.fdopen(fd, 'w') as stream:
     stream.write('\n')
 PY
 fi
+
+# Migrate the former GitHub repository name while preserving host-specific settings.
+python3 - "$repo_dir" "$run_user" <<'PY'
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+repo_dir = Path(sys.argv[1]).resolve()
+run_user = sys.argv[2]
+config_path = Path('/etc/dalitu-autodeploy.json')
+config = json.loads(config_path.read_text(encoding='utf-8'))
+old_repo = 'DuyLinh0212/HuTube'
+canonical_repo = 'DuyLinh0212/Dalitu'
+if config.get('repository') not in {old_repo, canonical_repo}:
+    raise SystemExit('Unexpected auto-deploy repository; refusing to change it')
+if Path(config.get('repo_dir', '')).resolve() != repo_dir:
+    raise SystemExit('Auto-deploy checkout differs from the configured checkout')
+
+old_remote = 'https://github.com/' + old_repo + '.git'
+canonical_remote = 'https://github.com/' + canonical_repo + '.git'
+remote = subprocess.run(
+    ['runuser', '-u', run_user, '--', 'git', '-C', str(repo_dir), 'remote', 'get-url', 'origin'],
+    check=True, capture_output=True, text=True,
+).stdout.strip()
+if remote not in {old_remote, canonical_remote}:
+    raise SystemExit('Unexpected Git origin; refusing to change it')
+
+config['repository'] = canonical_repo
+temporary = config_path.with_name(config_path.name + '.tmp')
+fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+    json.dump(config, stream, indent=2)
+    stream.write('\n')
+os.replace(temporary, config_path)
+
+if remote != canonical_remote:
+    subprocess.run(
+        ['runuser', '-u', run_user, '--', 'git', '-C', str(repo_dir),
+         'remote', 'set-url', 'origin', canonical_remote],
+        check=True,
+    )
+PY
 
 cat > /etc/systemd/system/dalitu-autodeploy.service <<'UNIT'
 [Unit]
