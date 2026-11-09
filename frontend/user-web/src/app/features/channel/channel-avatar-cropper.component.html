@@ -1,0 +1,28 @@
+<dialog #dialog class="avatar-crop-dialog" aria-labelledby="avatar-crop-title" aria-describedby="avatar-crop-help" (cancel)="cancel($event)" (keydown)="$event.stopPropagation()">
+  <header>
+    <h2 id="avatar-crop-title">{{ 'channel.cropAvatar' | translate }}</h2>
+    <button type="button" class="close-button" (click)="cancel()" [disabled]="saving()" [attr.aria-label]="'common.close' | translate">×</button>
+  </header>
+  <p id="avatar-crop-help">{{ 'channel.cropHelp' | translate }}</p>
+  @if (error()) { <p class="crop-error" role="alert">{{ error() }}</p> }
+  @if (loaded()) {
+    <div #stage class="crop-stage" tabindex="0" role="group" [attr.aria-label]="'channel.cropRegion' | translate"
+      (pointerdown)="startDrag($event)" (pointermove)="moveDrag($event)" (pointerup)="endDrag()" (pointercancel)="endDrag()" (lostpointercapture)="endDrag()" (keydown)="moveWithKeyboard($event)">
+      <img [src]="source()" alt="" draggable="false" [style.width.%]="imageWidth()" [style.height.%]="imageHeight()" [style.left.%]="imageLeft()" [style.top.%]="imageTop()" />
+      <span class="crop-mask" aria-hidden="true"></span>
+    </div>
+    <p class="keyboard-help">{{ 'channel.cropKeyboard' | translate }}</p>
+    <label class="zoom-control" for="avatar-crop-zoom">
+      <span>{{ 'channel.cropZoom' | translate }}</span>
+      <input id="avatar-crop-zoom" type="range" min="1" max="4" step="0.01" [value]="zoom()" (input)="setZoom($any($event.target).value)" [disabled]="saving()" />
+    </label>
+    @if (file().type === 'image/gif') { <p class="keyboard-help">{{ 'channel.avatarGifNote' | translate }}</p> }
+  } @else if (!error()) {
+    <p role="status">{{ 'common.loading' | translate }}</p>
+  }
+  <footer>
+    <button type="button" class="reset-button" (click)="reset()" [disabled]="!loaded() || saving()">{{ 'channel.cropReset' | translate }}</button>
+    <button type="button" class="cancel-button" (click)="cancel()" [disabled]="saving()">{{ 'channel.cancel' | translate }}</button>
+    <button type="button" class="apply-button" (click)="apply()" [disabled]="!loaded() || saving()">{{ 'channel.cropApply' | translate }}</button>
+  </footer>
+</dialog>

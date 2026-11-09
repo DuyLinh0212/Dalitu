@@ -1,4 +1,5 @@
 """Validate/persist basic settings and real PNG branding in isolated fixtures."""
+from support.avatar_crop import confirm_avatar_crop
 import json
 import struct
 import zlib
@@ -134,6 +135,7 @@ def run(suite, owner, member):
             with page.expect_response(lambda response: response.request.method == 'POST' and response.url.endswith(base + '/' + kind)) as pending:
                 page.locator('.branding-tab-pane input[type=file]').nth(index).set_input_files(
                     {'name': 'hutube-e2e-' + kind + '.png', 'mimeType': 'image/png', 'buffer': png(*dimensions)})
+                if kind == 'avatar': confirm_avatar_crop(page)
             assert pending.value.status == 200
             value = suite.api(owner, 'get', '/channels/me').json()[field]
             assert value

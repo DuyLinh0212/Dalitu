@@ -2,6 +2,7 @@
 import struct
 import zlib
 from playwright.sync_api import expect
+from support.avatar_crop import confirm_avatar_crop
 from flows.expanded.channels import png_bytes
 from flows.expanded.common import case,snapshot_module
 from tests.full_functional import register
@@ -32,8 +33,14 @@ def run(suite,config,actors):
                 p.locator('.settings-tabs-nav .tab-btn').nth(1).click()
                 size=maximum*1024*1024
                 payload={'name':'qc-exact-limit.png','mimeType':'image/png','buffer':exact_png(size)}
+                if kind=='avatar':
+                    suite.api(owner,'post','/channels/'+cid+'/avatar',multipart={'file':payload},expected=200)
+                    uploaded=True
+                def choose_image():
+                    p.locator('.branding-tab-pane input[type=file]').nth(index).set_input_files(payload)
+                    if kind=='avatar': confirm_avatar_crop(p)
                 response=suite.response(owner,'/channels/'+cid+'/'+kind,
-                    lambda:p.locator('.branding-tab-pane input[type=file]').nth(index).set_input_files(payload),method='POST',status=200)
+                    choose_image,method='POST',status=200)
                 uploaded=True;url=response.json()[kind+'Url'];assert url
                 actual=suite.api(owner,'get','/channels/me').json();assert actual[kind+'Url']==url
                 p.reload();p.locator('.settings-tabs-nav .tab-btn').nth(1).click()
@@ -41,7 +48,7 @@ def run(suite,config,actors):
                 image.evaluate('(i)=>i.decode()');assert image.evaluate('(i)=>i.naturalWidth>0')
                 entry['resource_ids']=[cid];entry['input_bytes']=size;entry['maximum_file_bytes']=size
                 entry['steps']=['Valid PNG with a CRC-correct private ancillary chunk, exactly '+str(maximum)+'MiB',
-                    'Actual browser file input and multipart upload must return 200 at the inclusive file limit',
+                    'Avatar: verify original exact-limit upload through API, then accept that source in browser crop and upload the cropped PNG; other branding: original browser multipart returns 200',
                     'Read persisted exact URL; reload and decode the image','Restore prior branding URL after evidence assertions']
             finally:
                 if uploaded:

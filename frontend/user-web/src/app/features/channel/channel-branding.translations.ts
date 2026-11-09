@@ -1,0 +1,28 @@
+export const CHANNEL_BRANDING_TRANSLATIONS = {
+  vi: {
+    'channel.cropAvatar': 'Điều chỉnh ảnh đại diện',
+    'channel.cropHelp': 'Kéo ảnh để chọn phần muốn hiển thị. Phần ngoài khung tròn sẽ được cắt bỏ.',
+    'channel.cropKeyboard': 'Có thể dùng phím mũi tên để di chuyển ảnh.',
+    'channel.cropRegion': 'Vùng cắt ảnh đại diện. Dùng phím mũi tên để di chuyển ảnh.',
+    'channel.cropZoom': 'Thu phóng',
+    'channel.cropReset': 'Đặt lại',
+    'channel.cropApply': 'Dùng ảnh này',
+    'channel.avatarFileError': 'Chọn ảnh JPG, PNG, WEBP hoặc GIF hợp lệ.',
+    'channel.avatarReadError': 'Không đọc được ảnh. Vui lòng chọn ảnh khác.',
+    'channel.avatarCropError': 'Không thể cắt ảnh. Vui lòng thử lại.',
+    'channel.avatarGifNote': 'Ảnh GIF sẽ được lưu thành ảnh tĩnh.',
+  },
+  en: {
+    'channel.cropAvatar': 'Adjust profile picture',
+    'channel.cropHelp': 'Drag the image to choose what appears. Everything outside the circle will be cropped out.',
+    'channel.cropKeyboard': 'You can also use the arrow keys to move the image.',
+    'channel.cropRegion': 'Profile picture crop area. Use the arrow keys to move the image.',
+    'channel.cropZoom': 'Zoom',
+    'channel.cropReset': 'Reset',
+    'channel.cropApply': 'Use this picture',
+    'channel.avatarFileError': 'Choose a valid JPG, PNG, WEBP or GIF image.',
+    'channel.avatarReadError': 'Unable to read this image. Please choose another one.',
+    'channel.avatarCropError': 'Unable to crop this image. Please try again.',
+    'channel.avatarGifNote': 'GIF images will be saved as a still picture.',
+  },
+};

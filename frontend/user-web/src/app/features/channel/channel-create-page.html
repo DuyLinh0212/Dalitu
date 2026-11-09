@@ -60,7 +60,7 @@
             <input #bannerInput type="file" accept="image/jpeg,image/png,image/webp" (change)="onBannerSelected($event)" hidden />
           </div>
 
-          <div class="avatar-overlap-box" (click)="avatarInput.click()" [title]="'channel.uploadAvatar' | translate">
+          <div class="avatar-overlap-box" role="button" tabindex="0" (click)="!busy() && avatarInput.click()" (keydown.enter)="!busy() && avatarInput.click()" (keydown.space)="$event.preventDefault(); !busy() && avatarInput.click()" [attr.aria-label]="'channel.uploadAvatar' | translate" [attr.aria-disabled]="busy()" [title]="'channel.uploadAvatar' | translate">
             @if (avatarPreview) {
               <img [src]="avatarPreview" [alt]="'channel.avatarAlt' | translate" class="avatar-img" />
             } @else {
@@ -113,12 +113,13 @@
 
         <div class="form-group">
           <label for="channelEmail" class="input-label">{{ 'channel.contactEmail' | translate }}</label>
-          <input id="channelEmail" type="email" class="text-input" [(ngModel)]="contactEmail" name="contactEmail" [placeholder]="'channel.contactEmailPlaceholder' | translate" [disabled]="busy()" />
+          <input id="channelEmail" type="email" class="text-input" [(ngModel)]="contactEmail" name="contactEmail" [placeholder]="'channel.contactEmailPlaceholder' | translate" [disabled]="busy()" autocomplete="email" maxlength="254" [attr.aria-invalid]="!contactEmailValid()" [attr.aria-describedby]="contactEmailValid() ? null : 'channel-email-error'" />
+          @if (!contactEmailValid()) { <p id="channel-email-error" class="email-error" role="status">{{ 'auth.emailInvalid' | translate }}</p> }
         </div>
 
         <div class="form-actions">
           <button type="button" [routerLink]="studioMode ? '/account' : '/account'" class="btn-secondary" [disabled]="busy()">{{ 'channel.cancel' | translate }}</button>
-          <button type="submit" class="btn-primary" [disabled]="busy() || !name.trim() || !handle.trim() || handleValid() === false">
+          <button type="submit" class="btn-primary" [disabled]="busy() || !!avatarCropFile() || !name.trim() || !handle.trim() || handleValid() === false || !contactEmailValid()">
             @if (busy()) { <span class="spinner"></span> {{ 'channel.creating' | translate }} } @else { {{ 'channel.createNow' | translate }} }
           </button>
         </div>
@@ -126,3 +127,6 @@
     </div>
   }
 </main>
+@if (avatarCropFile(); as file) {
+  <app-channel-avatar-cropper [file]="file" (cancelled)="avatarCropFile.set(null)" (confirmed)="onAvatarCropped($event)" />
+}
