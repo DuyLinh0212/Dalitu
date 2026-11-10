@@ -3,38 +3,51 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace HuTube.Infrastructure.Operations;
 
 public sealed class DatabaseBackupWorker(
     IServiceScopeFactory scopes,
+    BackgroundWorkWakeup<DatabaseBackupWorker> wakeup,
+    TimeProvider clock,
     ILogger<DatabaseBackupWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var missedClaims = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
-            try { await RunWithLeadershipAsync(stoppingToken); }
+            var delay = TimeSpan.FromSeconds(30);
+            try
+            {
+                var (acquired, nextDue) = await RunWithLeadershipAsync(stoppingToken);
+                missedClaims = acquired ? 0 : missedClaims + 1;
+                delay = !acquired && missedClaims <= 3 ? TimeSpan.FromSeconds(5)
+                    : BackgroundWorkWakeup<DatabaseBackupWorker>.DelayUntil(nextDue, clock.GetUtcNow());
+            }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception ex) { logger.LogWarning(ex, "Database backup worker lost its database connection; reconnecting."); }
             if (!stoppingToken.IsCancellationRequested)
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                await wakeup.WaitAsync(delay, stoppingToken);
         }
     }
 
-    private async Task RunWithLeadershipAsync(CancellationToken stoppingToken)
+    private async Task<(bool Acquired, DateTimeOffset? NextDue)> RunWithLeadershipAsync(CancellationToken stoppingToken)
     {
         // A PostgreSQL session lock keeps only one API instance responsible for schedules and jobs.
         await using var lockScope = scopes.CreateAsyncScope();
         var lockDb = lockScope.ServiceProvider.GetRequiredService<HuTubeDbContext>();
-        await lockDb.Database.OpenConnectionAsync(stoppingToken);
-        await using var claim = lockDb.Database.GetDbConnection().CreateCommand();
+        await using var lockConnection = new NpgsqlConnection(DatabaseConnectionString.ForSessionLocks(
+            lockDb.Database.GetConnectionString() ?? throw new InvalidOperationException("Missing database connection.")));
+        await lockConnection.OpenAsync(stoppingToken);
+        await using var claim = lockConnection.CreateCommand();
         claim.CommandText = "SELECT pg_try_advisory_lock(hashtextextended('hutube:database-backup-worker', 0))";
-        while (!(bool)(await claim.ExecuteScalarAsync(stoppingToken))!)
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        if (!(bool)(await claim.ExecuteScalarAsync(stoppingToken))!) return (false, null);
 
+        DateTimeOffset? nextDue = null;
         using var lease = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        var monitor = MonitorLockAsync(lockDb, lease);
+        var monitor = MonitorLockAsync(lockConnection, lease);
         var workerToken = lease.Token;
         try
         {
@@ -51,12 +64,15 @@ public sealed class DatabaseBackupWorker(
                     var backups = scope.ServiceProvider.GetRequiredService<AdminDatabaseBackupService>();
                     await backups.QueueDueScheduleAsync(workerToken);
                     processed = await backups.ProcessNextQueuedRunAsync(workerToken);
+                    if (!processed) nextDue = await backups.NextScheduleDueAsync(workerToken);
                 }
                 catch (OperationCanceledException) when (workerToken.IsCancellationRequested) { break; }
-                catch (Exception ex) { logger.LogError(ex, "Database backup job polling failed."); }
+                catch (Exception ex) { logger.LogError(ex, "Database backup job polling failed."); throw; }
 
-                if (!processed) await Task.Delay(TimeSpan.FromSeconds(4), workerToken);
+                if (!processed) break;
             }
+            if (lease.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+                throw new InvalidOperationException("Database backup worker lost its leadership connection.");
         }
         finally
         {
@@ -64,22 +80,23 @@ public sealed class DatabaseBackupWorker(
             await monitor;
             try
             {
-                await using var release = lockDb.Database.GetDbConnection().CreateCommand();
+                await using var release = lockConnection.CreateCommand();
                 release.CommandText = "SELECT pg_advisory_unlock(hashtextextended('hutube:database-backup-worker', 0))";
                 await release.ExecuteScalarAsync(CancellationToken.None);
             }
-            finally { await lockDb.Database.CloseConnectionAsync(); }
+            finally { await lockConnection.CloseAsync(); }
         }
+        return (true, nextDue);
     }
 
-    private static async Task MonitorLockAsync(HuTubeDbContext db, CancellationTokenSource lease)
+    private static async Task MonitorLockAsync(NpgsqlConnection connection, CancellationTokenSource lease)
     {
         try
         {
             while (!lease.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(5), lease.Token);
-                await using var ping = db.Database.GetDbConnection().CreateCommand();
+                await using var ping = connection.CreateCommand();
                 ping.CommandText = "SELECT 1";
                 await ping.ExecuteScalarAsync(lease.Token);
             }

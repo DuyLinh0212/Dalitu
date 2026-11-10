@@ -4,6 +4,19 @@ namespace HuTube.Infrastructure.Persistence;
 
 public static class DatabaseConnectionString
 {
+    // Session advisory locks require a dedicated PostgreSQL session. Neon's
+    // transaction pooler may hand each command to a different backend.
+    public static string ForSessionLocks(string value)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(Normalize(value));
+        var host = builder.Host;
+        if (host != null && host.EndsWith(".neon.tech", StringComparison.OrdinalIgnoreCase)
+            && host.Contains("-pooler.", StringComparison.OrdinalIgnoreCase))
+            builder.Host = host.Replace("-pooler.", ".", StringComparison.OrdinalIgnoreCase);
+        builder.Pooling = false;
+        return builder.ConnectionString;
+    }
+
     public static string Normalize(string value)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("postgres" or "postgresql")) return value;

@@ -166,11 +166,14 @@ builder.Services.AddSingleton<VideoChunkUploadStore>();
 builder.Services.AddSingleton<VideoUploadCompletionWorker>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<VideoUploadCompletionWorker>());
 builder.Services.AddScoped<IPlanService, PlanService>();
+builder.Services.AddSingleton<BackgroundWorkWakeup<PlanExpirationWorker>>();
+builder.Services.AddSingleton<BackgroundWorkWakeup<ChannelSuspensionExpirationWorker>>();
 builder.Services.AddHostedService<PlanExpirationWorker>();
 builder.Services.AddHostedService<ChannelSuspensionExpirationWorker>();
 builder.Services.AddScoped<AdminSubscriptionService>();
 builder.Services.AddScoped<AdminPaymentService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddSingleton<PaymentExpiryWakeup>();
 builder.Services.AddHostedService<PaymentExpirationWorker>();
  builder.Services.AddScoped<IPlaylistService, PlaylistService>();
 builder.Services.AddScoped<PolicyService>();
@@ -181,6 +184,7 @@ builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<AdminContentService>();
 builder.Services.AddScoped<AdminOperationsService>();
 builder.Services.AddScoped<AdminDatabaseBackupService>();
+builder.Services.AddSingleton<BackgroundWorkWakeup<DatabaseBackupWorker>>();
 builder.Services.AddHostedService<DatabaseBackupWorker>();
 builder.Services.AddSingleton(new ApiRequestTelemetry());
 builder.Services.AddScoped<AppealService>();
@@ -194,6 +198,8 @@ builder.Services.AddSingleton(rabbitMq);
 builder.Services.AddSingleton<RabbitMqTransport>();
 builder.Services.AddSingleton<IModerationEventPublisher>(provider => provider.GetRequiredService<RabbitMqTransport>());
 builder.Services.AddScoped<ModerationOutboxPublisher>();
+builder.Services.AddSingleton<BackgroundWorkWakeup<ModerationOutboxWorker>>();
+builder.Services.AddSingleton(new BackgroundWorkWakeup<NotificationDeliveryWorker>(4));
 builder.Services.AddScoped<NotificationFanout>();
 builder.Services.AddScoped<NotificationDeliveryProcessor>();
 builder.Services.AddScoped<PushDeviceService>();
@@ -217,6 +223,7 @@ builder.Services.AddHttpClient<IRecommendationClient, RecommendationClient>();
 var recommendationStorage = builder.Configuration.GetSection("Recommendation:Storage").Get<R2Options>() ?? r2Options;
 builder.Services.AddScoped<IRecommendationSnapshotStore>(_ => new RecommendationSnapshotStore(recommendationStorage));
 builder.Services.AddScoped<RecommendationAdminService>();
+builder.Services.AddSingleton<BackgroundWorkWakeup<RecommendationJobWorker>>();
 builder.Services.AddHostedService<RecommendationJobWorker>();
 builder.Services.AddSingleton<IAuthEmailSender, AuthEmailSender>();
 builder.Services.AddScoped<ReadModelCacheFilter>();
@@ -356,12 +363,22 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseMiddleware<ApiRequestTelemetryMiddleware>();
 app.UseMiddleware<ExceptionMiddleware>();
+app.Use(async (context, next) => {
+    await next(context);
+    if (context.Response.StatusCode < 400 && !HttpMethods.IsGet(context.Request.Method)
+        && !HttpMethods.IsHead(context.Request.Method) && !HttpMethods.IsOptions(context.Request.Method))
+    {
+        context.RequestServices.GetRequiredService<BackgroundWorkWakeup<PlanExpirationWorker>>().Signal();
+        context.RequestServices.GetRequiredService<BackgroundWorkWakeup<ChannelSuspensionExpirationWorker>>().Signal();
+    }
+});
 app.UseAuthentication(); app.UseRateLimiter(); app.UseMiddleware<AdminApiAuditMiddleware>(); app.UseAuthorization();
 app.UseStatusCodePages(context => ApiErrors.WriteAsync(context.HttpContext, context.HttpContext.Response.StatusCode, "HTTP_ERROR", "Yêu cầu không được xử lý."));
 if (!app.Environment.IsProduction()) {
     app.MapOpenApi();
     app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "Dalitu API v1"));
 }
+app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapGet("/health", async (HuTubeDbContext db, CancellationToken ct) => {
     try { return await db.Database.CanConnectAsync(ct) && await db.Users.OrderBy(x => x.UserId).Take(1).CountAsync(ct) >= 0
         ? Results.Ok(new { status = "healthy" }) : Results.Json(new { status = "unhealthy" }, statusCode: 503); }

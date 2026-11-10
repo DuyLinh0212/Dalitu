@@ -10,18 +10,24 @@ namespace HuTube.Infrastructure.Payments;
 public sealed class PaymentExpirationWorker(
     IServiceScopeFactory scopeFactory,
     TimeProvider clock,
+    PaymentExpiryWakeup wakeup,
     ILogger<PaymentExpirationWorker> logger) : BackgroundService
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
+    // Reconcile infrequently in case another instance commits a payment and
+    // stops before its local scheduler observes it.
+    private static readonly TimeSpan ReconciliationInterval = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan ErrorRetryInterval = TimeSpan.FromMinutes(1);
     private const int BatchSize = 100;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            var delay = ErrorRetryInterval;
             try
             {
-                await ExpirePaymentsAsync(stoppingToken);
+                var nextExpiry = await ExpirePaymentsAndFindNextAsync(stoppingToken);
+                delay = GetDelay(nextExpiry, clock.GetUtcNow());
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -32,11 +38,20 @@ public sealed class PaymentExpirationWorker(
                 logger.LogError(exception, "Failed to expire pending payments.");
             }
 
-            await Task.Delay(PollInterval, stoppingToken);
+            await wakeup.WaitAsync(delay, stoppingToken);
         }
     }
 
-    private async Task ExpirePaymentsAsync(CancellationToken ct)
+    internal static TimeSpan GetDelay(DateTimeOffset? nextExpiry, DateTimeOffset now)
+    {
+        var recoveryDelay = BackgroundWorkSchedule.UntilNextBoundary(ReconciliationInterval, now);
+        if (!nextExpiry.HasValue) return recoveryDelay;
+        var untilExpiry = nextExpiry.Value - now;
+        if (untilExpiry <= TimeSpan.Zero) return TimeSpan.Zero;
+        return untilExpiry < recoveryDelay ? untilExpiry : recoveryDelay;
+    }
+
+    private async Task<DateTimeOffset?> ExpirePaymentsAndFindNextAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<HuTubeDbContext>();
@@ -50,9 +65,11 @@ public sealed class PaymentExpirationWorker(
 
         foreach (var candidate in expired)
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({candidate.UserId.ToString()}, 0))", ct);
+            await using var transaction = db.Database.IsRelational()
+                ? await db.Database.BeginTransactionAsync(ct) : null;
+            if (db.Database.IsNpgsql())
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtextextended({"plan-membership:" + candidate.UserId}, 0))", ct);
 
             var payment = await db.Payments.SingleOrDefaultAsync(item => item.PaymentId == candidate.PaymentId, ct);
             if (payment is { Status: "pending" } && payment.ExpiresAt <= now)
@@ -62,7 +79,14 @@ public sealed class PaymentExpirationWorker(
                 await db.SaveChangesAsync(ct);
             }
 
-            await transaction.CommitAsync(ct);
+            if (transaction != null) await transaction.CommitAsync(ct);
         }
+
+        // Continue immediately when there may be more than one batch due.
+        if (expired.Count == BatchSize) return now;
+        return await db.Payments.AsNoTracking()
+            .Where(payment => payment.Status == "pending")
+            .Select(payment => (DateTimeOffset?)payment.ExpiresAt)
+            .MinAsync(ct);
     }
 }

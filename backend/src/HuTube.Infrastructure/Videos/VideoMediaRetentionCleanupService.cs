@@ -26,9 +26,11 @@ public sealed class VideoMediaRetentionCleanupService(
         {
             await RunCleanupSafelyAsync(stoppingToken);
 
-            using var timer = new PeriodicTimer(Interval, clock);
-            while (await timer.WaitForNextTickAsync(stoppingToken))
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(BackgroundWorkSchedule.UntilNextBoundary(Interval, clock.GetUtcNow()), clock, stoppingToken);
                 await RunCleanupSafelyAsync(stoppingToken);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

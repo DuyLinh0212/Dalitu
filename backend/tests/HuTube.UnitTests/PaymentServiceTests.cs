@@ -97,6 +97,25 @@ public sealed class PaymentServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task InitiateAsync_DefaultExpiry_IsOneDayAndWakesScheduler()
+    {
+        _options.PaymentExpiryMinutes = new SepayOptions().PaymentExpiryMinutes;
+        var plan = new Plan { PlanId = Guid.NewGuid(), Code = "one-day", Name = "One day",
+            Price = 99000, DurationDays = 30, Status = "active" };
+        _db.Plans.Add(plan);
+        await _db.SaveChangesAsync();
+        using var wakeup = new PaymentExpiryWakeup();
+        var service = new PaymentService(_db, _mockPlanService, _options, TimeProvider.System, wakeup);
+        var before = DateTimeOffset.UtcNow;
+
+        var payment = await service.InitiateAsync(Guid.NewGuid(), new CreatePaymentRequest(plan.PlanId));
+
+        Assert.InRange(payment.ExpiresAt, before.AddDays(1), DateTimeOffset.UtcNow.AddDays(1));
+        Assert.True(await wakeup.WaitAsync(TimeSpan.Zero, CancellationToken.None));
+        Assert.False(await wakeup.WaitAsync(TimeSpan.Zero, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task InitiateAsync_WhenPaidPlan_CreatesPendingPaymentWithQr()
     {
         var plan = new Plan

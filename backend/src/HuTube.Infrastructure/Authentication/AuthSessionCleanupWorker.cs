@@ -24,9 +24,11 @@ public sealed class AuthSessionCleanupWorker(
         try
         {
             await CleanupSafelyAsync(stoppingToken);
-            using var timer = new PeriodicTimer(Interval, clock);
-            while (await timer.WaitForNextTickAsync(stoppingToken))
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(BackgroundWorkSchedule.UntilNextBoundary(Interval, clock.GetUtcNow()), clock, stoppingToken);
                 await CleanupSafelyAsync(stoppingToken);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

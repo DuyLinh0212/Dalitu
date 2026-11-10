@@ -5,6 +5,7 @@ import { LocaleCurrencyPipe } from '../../core/locale-currency.pipe';
 import { TranslatePipe } from '../../core/translate.pipe';
 import { I18nService } from '../../core/i18n.service';
 import { Subscription, interval } from 'rxjs';
+import { formatPaymentCountdown } from './payment-countdown';
 
 @Component({
   selector: 'app-payment-modal',
@@ -247,9 +248,7 @@ export class PaymentModalComponent implements OnInit, OnDestroy {
         }
         return;
       }
-      const mins = Math.floor(diff / 60);
-      const secs = diff % 60;
-      this.remainingTime.set(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
+      this.remainingTime.set(formatPaymentCountdown(diff));
     };
     update();
     this.timerSub = interval(1000).subscribe(update);

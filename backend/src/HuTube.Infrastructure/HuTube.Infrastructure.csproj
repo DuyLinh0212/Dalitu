@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="HuTube.UnitTests" />
     <ProjectReference Include="..\HuTube.Application\HuTube.Application.csproj" />
     <ProjectReference Include="..\HuTube.Domain\HuTube.Domain.csproj" />
   </ItemGroup>

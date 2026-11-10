@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace HuTube.Infrastructure.Plans;
 
@@ -15,6 +16,7 @@ namespace HuTube.Infrastructure.Plans;
 public sealed class PlanExpirationWorker(
     IServiceScopeFactory scopes,
     TimeProvider clock,
+    BackgroundWorkWakeup<PlanExpirationWorker> wakeup,
     ILogger<PlanExpirationWorker> logger) : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
@@ -24,22 +26,38 @@ public sealed class PlanExpirationWorker(
     {
         try
         {
-            await ProcessExpiredSubscriptionsSafelyAsync(stoppingToken);
-
-            using var timer = new PeriodicTimer(Interval, clock);
-            while (await timer.WaitForNextTickAsync(stoppingToken))
-                await ProcessExpiredSubscriptionsSafelyAsync(stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var delay = TimeSpan.FromSeconds(30);
+                try
+                {
+                    if (await ProcessExpiredSubscriptionsSafelyAsync(stoppingToken))
+                    {
+                        await using var scope = scopes.CreateAsyncScope();
+                        var db = scope.ServiceProvider.GetRequiredService<HuTubeDbContext>();
+                        var next = await db.PlanHistories.AsNoTracking()
+                            .Where(history => history.Status == "active" && history.EndedAt.HasValue)
+                            .Select(history => history.EndedAt).MinAsync(stoppingToken);
+                        var now = clock.GetUtcNow();
+                        delay = next <= now ? Interval : BackgroundWorkWakeup<PlanExpirationWorker>.DelayUntil(next, now);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                { logger.LogError(ex, "Không thể lên lịch kiểm tra gói hết hạn."); }
+                await wakeup.WaitAsync(delay, stoppingToken);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
         }
     }
 
-    private async Task ProcessExpiredSubscriptionsSafelyAsync(CancellationToken ct)
+    private async Task<bool> ProcessExpiredSubscriptionsSafelyAsync(CancellationToken ct)
     {
         try
         {
             await ProcessExpiredSubscriptionsAsync(ct);
+            return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -48,6 +66,7 @@ public sealed class PlanExpirationWorker(
         catch (Exception ex)
         {
             logger.LogError(ex, "Không thể chuyển tài khoản có gói hết hạn về gói mặc định.");
+            return false;
         }
     }
 
@@ -55,11 +74,13 @@ public sealed class PlanExpirationWorker(
     {
         await using var lockScope = scopes.CreateAsyncScope();
         var lockDb = lockScope.ServiceProvider.GetRequiredService<HuTubeDbContext>();
-        await lockDb.Database.OpenConnectionAsync(ct);
+        await using var lockConnection = new NpgsqlConnection(DatabaseConnectionString.ForSessionLocks(
+            lockDb.Database.GetConnectionString() ?? throw new InvalidOperationException("Missing database connection.")));
+        await lockConnection.OpenAsync(ct);
         var acquiredLock = false;
         try
         {
-            await using var command = lockDb.Database.GetDbConnection().CreateCommand();
+            await using var command = lockConnection.CreateCommand();
             command.CommandText = "SELECT pg_try_advisory_lock(hashtextextended('hutube:plan-expiration-worker', 0))";
             acquiredLock = (bool)(await command.ExecuteScalarAsync(ct))!;
             if (!acquiredLock) return;
@@ -72,7 +93,7 @@ public sealed class PlanExpirationWorker(
             {
                 try
                 {
-                    await using var command = lockDb.Database.GetDbConnection().CreateCommand();
+                    await using var command = lockConnection.CreateCommand();
                     command.CommandText = "SELECT pg_advisory_unlock(hashtextextended('hutube:plan-expiration-worker', 0))";
                     await command.ExecuteScalarAsync(CancellationToken.None);
                 }
@@ -82,7 +103,7 @@ public sealed class PlanExpirationWorker(
                 }
             }
 
-            await lockDb.Database.CloseConnectionAsync();
+            await lockConnection.CloseAsync();
         }
     }
 

@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HuTube.Infrastructure.Notifications;
 
-public sealed class NotificationFanout(HuTubeDbContext db, TimeProvider clock)
+public sealed class NotificationFanout(HuTubeDbContext db, TimeProvider clock,
+    BackgroundWorkWakeup<NotificationDeliveryWorker>? wakeup = null)
 {
     // A cursor and all rows for one bounded batch commit together. Redeliveries
     // resume this cursor and cannot create duplicate inbox notifications.
@@ -76,6 +77,7 @@ public sealed class NotificationFanout(HuTubeDbContext db, TimeProvider clock)
         }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        wakeup?.Signal();
         return inbox.CompletedAt != null;
     }
 }

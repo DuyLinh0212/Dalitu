@@ -57,7 +57,8 @@ public sealed class RecommendationAdminService(
     HuTubeDbContext db, IRecommendationSnapshotStore snapshots,
     IHttpClientFactory clients, RecommendationOptions options,
     IPasswordService passwords, IContentService content, ChannelService channels,
-    ILogger<RecommendationAdminService> logger)
+    ILogger<RecommendationAdminService> logger,
+    BackgroundWorkWakeup<RecommendationJobWorker>? jobWakeup = null)
 {
     private const int VideoPickerPageSize = 200;
     private const int MaxSimulationVideoCount = 10_000;
@@ -410,6 +411,7 @@ public sealed class RecommendationAdminService(
         };
         db.RecommendationJobs.Add(job);
         await db.SaveChangesAsync(ct);
+        jobWakeup?.Signal();
         return job;
     }
 
@@ -578,6 +580,7 @@ public sealed class RecommendationAdminService(
             NewValues = Serialize(new { users = request.UserIds, videos = request.VideoIds,
                 request.Mode, request.ActionsPerUser, request.VideoSkipRate, categoryRates }), CreatedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync(ct);
+        jobWakeup?.Signal();
         return job;
     }
 

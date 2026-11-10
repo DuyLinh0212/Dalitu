@@ -33,7 +33,8 @@ public sealed class AdminDatabaseBackupService(
     IConfiguration configuration,
     R2Options r2Options,
     TimeProvider clock,
-    ILogger<AdminDatabaseBackupService> logger) : IDisposable
+    ILogger<AdminDatabaseBackupService> logger,
+    BackgroundWorkWakeup<DatabaseBackupWorker>? backupWakeup = null) : IDisposable
 {
     private const string DefaultTimeZoneId = "Asia/Ho_Chi_Minh";
     private const string BackupPrefix = "database-backups";
@@ -143,6 +144,7 @@ public sealed class AdminDatabaseBackupService(
             ipAddress,
             userAgent), ct);
         await transaction.CommitAsync(ct);
+        backupWakeup?.Signal();
         return MapSchedule(schedule);
     }
 
@@ -180,6 +182,7 @@ public sealed class AdminDatabaseBackupService(
             IpAddress: ipAddress,
             UserAgent: userAgent), ct);
         await transaction.CommitAsync(ct);
+        backupWakeup?.Signal();
         return MapRun(run);
     }
 
@@ -232,6 +235,11 @@ public sealed class AdminDatabaseBackupService(
         if (interrupted > 0)
             logger.LogWarning("Marked {RunCount} interrupted database backups as failed.", interrupted);
     }
+
+    public Task<DateTimeOffset?> NextScheduleDueAsync(CancellationToken ct) => !IsR2Configured()
+        ? Task.FromResult<DateTimeOffset?>(null)
+        : db.DatabaseBackupSchedules.AsNoTracking().Where(schedule => schedule.Enabled)
+            .Select(schedule => schedule.NextRunAt).FirstOrDefaultAsync(ct);
 
     public async Task QueueDueScheduleAsync(CancellationToken ct)
     {

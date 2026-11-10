@@ -3,36 +3,48 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace HuTube.Infrastructure.Recommendations;
 
 public sealed class RecommendationJobWorker(IServiceScopeFactory scopes,
+    BackgroundWorkWakeup<RecommendationJobWorker> wakeup, TimeProvider clock,
     ILogger<RecommendationJobWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var missedClaims = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
-            try { await RunWithLeadershipAsync(stoppingToken); }
+            var delay = TimeSpan.FromSeconds(30);
+            try
+            {
+                var acquired = await RunWithLeadershipAsync(stoppingToken);
+                missedClaims = acquired ? 0 : missedClaims + 1;
+                delay = !acquired && missedClaims <= 3 ? TimeSpan.FromSeconds(5)
+                    : BackgroundWorkWakeup<RecommendationJobWorker>.DelayUntil(null, clock.GetUtcNow());
+            }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception ex) { logger.LogWarning(ex, "Recommendation worker lost its database connection; reconnecting."); }
-            if (!stoppingToken.IsCancellationRequested) await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            if (!stoppingToken.IsCancellationRequested) await wakeup.WaitAsync(delay, stoppingToken);
         }
     }
 
-    private async Task RunWithLeadershipAsync(CancellationToken stoppingToken)
+    private async Task<bool> RunWithLeadershipAsync(CancellationToken stoppingToken)
     {
         // A session lock elects one worker across API instances. It is released by
         // PostgreSQL on process/connection loss, so only its new owner recovers jobs.
         await using var lockScope = scopes.CreateAsyncScope();
         var lockDb = lockScope.ServiceProvider.GetRequiredService<HuTubeDbContext>();
-        await lockDb.Database.OpenConnectionAsync(stoppingToken);
-        await using var claim = lockDb.Database.GetDbConnection().CreateCommand();
+        await using var lockConnection = new NpgsqlConnection(DatabaseConnectionString.ForSessionLocks(
+            lockDb.Database.GetConnectionString() ?? throw new InvalidOperationException("Missing database connection.")));
+        await lockConnection.OpenAsync(stoppingToken);
+        await using var claim = lockConnection.CreateCommand();
         claim.CommandText = "SELECT pg_try_advisory_lock(hashtextextended('hutube:recommendation-worker', 0))";
-        while (!(bool)(await claim.ExecuteScalarAsync(stoppingToken))!)
-            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+        if (!(bool)(await claim.ExecuteScalarAsync(stoppingToken))!) return false;
+        var hostStoppingToken = stoppingToken;
         using var lease = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        var monitor = MonitorLockAsync(lockDb, lease);
+        var monitor = MonitorLockAsync(lockConnection, lease);
         stoppingToken = lease.Token;
         try
         {
@@ -74,9 +86,11 @@ public sealed class RecommendationJobWorker(IServiceScopeFactory scopes,
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception ex) { logger.LogError(ex, "Recommendation job polling failed."); }
-            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            catch (Exception ex) { logger.LogError(ex, "Recommendation job polling failed."); throw; }
+            break;
         }
+        if (lease.IsCancellationRequested && !hostStoppingToken.IsCancellationRequested)
+            throw new InvalidOperationException("Recommendation worker lost its leadership connection.");
         }
         finally
         {
@@ -84,22 +98,23 @@ public sealed class RecommendationJobWorker(IServiceScopeFactory scopes,
             await monitor;
             try
             {
-                await using var release = lockDb.Database.GetDbConnection().CreateCommand();
+                await using var release = lockConnection.CreateCommand();
                 release.CommandText = "SELECT pg_advisory_unlock(hashtextextended('hutube:recommendation-worker', 0))";
                 await release.ExecuteScalarAsync(CancellationToken.None);
             }
-            finally { await lockDb.Database.CloseConnectionAsync(); }
+            finally { await lockConnection.CloseAsync(); }
         }
+        return true;
     }
 
-    private static async Task MonitorLockAsync(HuTubeDbContext db, CancellationTokenSource lease)
+    private static async Task MonitorLockAsync(NpgsqlConnection connection, CancellationTokenSource lease)
     {
         try
         {
             while (!lease.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), lease.Token);
-                await using var ping = db.Database.GetDbConnection().CreateCommand();
+                await using var ping = connection.CreateCommand();
                 ping.CommandText = "SELECT 1";
                 await ping.ExecuteScalarAsync(lease.Token);
             }

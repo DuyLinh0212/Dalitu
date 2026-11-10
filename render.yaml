@@ -7,7 +7,7 @@ services:
     branch: develop
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile
-    healthCheckPath: /health
+    healthCheckPath: /health/live
     autoDeployTrigger: checksPass
     envVars:
       - key: ASPNETCORE_ENVIRONMENT

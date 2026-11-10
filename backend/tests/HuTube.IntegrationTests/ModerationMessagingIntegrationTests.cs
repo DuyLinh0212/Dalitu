@@ -131,6 +131,31 @@ public sealed class ModerationMessagingIntegrationTests(AuthApiFactory factory) 
     }
 
     [Fact]
+    public async Task CommittedDecisionAndFanoutSignalTheirIdleWorkers()
+    {
+        var data = await SeedAsync(0);
+        using var outboxWakeup = new BackgroundWorkWakeup<ModerationOutboxWorker>();
+        using var deliveryWakeup = new BackgroundWorkWakeup<NotificationDeliveryWorker>(4);
+        VideoModerationEvent message;
+        await using (var db = factory.CreateDb())
+        {
+            var rbac = new RbacService(new RbacStore(db), new AuthStore(db));
+            var service = new ModerationService(db, rbac, factory.Storage,
+                new StrikePolicySettingsService(db, rbac), outboxWakeup: outboxWakeup);
+            var claim = await service.ClaimCaseAsync(data.Reviewer.UserId, data.Case.ModerationCaseId);
+            await service.ResolveCaseAsync(data.Reviewer.UserId, data.Case.ModerationCaseId,
+                new("approve", null, null, null, claim.ClaimId));
+            message = (await db.ModerationOutboxEvents.ToListAsync())
+                .Select(row => JsonSerializer.Deserialize<VideoModerationEvent>(row.Payload)!)
+                .Single(item => item.VideoId == data.Video.VideoId);
+        }
+        Assert.True(await outboxWakeup.WaitAsync(TimeSpan.Zero, CancellationToken.None));
+        await using (var db = factory.CreateDb())
+            await new NotificationFanout(db, TimeProvider.System, deliveryWakeup).ProcessBatchAsync(message);
+        Assert.True(await deliveryWakeup.WaitAsync(TimeSpan.Zero, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task DecisionCommitsOneSmallOutboxEvent_WithoutWaitingForAnyNotificationDelivery()
     {
         var data = await SeedAsync(12);

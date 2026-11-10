@@ -12,6 +12,10 @@ namespace HuTube.Infrastructure.Notifications;
 
 public sealed class ModerationOutboxPublisher(HuTubeDbContext db, IModerationEventPublisher publisher, TimeProvider clock)
 {
+    public Task<DateTimeOffset?> NextDueAsync(CancellationToken ct) => db.ModerationOutboxEvents.AsNoTracking()
+        .Where(message => message.PublishedAt == null)
+        .Select(message => (DateTimeOffset?)message.AvailableAt).MinAsync(ct);
+
     public async Task<bool> PublishNextAsync(CancellationToken ct = default)
     {
         var now = clock.GetUtcNow();
@@ -42,21 +46,27 @@ public sealed class ModerationOutboxPublisher(HuTubeDbContext db, IModerationEve
     internal static double RetrySeconds(int attempts) => Math.Min(300, Math.Pow(2, Math.Min(attempts, 8)));
 }
 
-public sealed class ModerationOutboxWorker(IServiceScopeFactory scopes, RabbitMqOptions options, ILogger<ModerationOutboxWorker> logger) : BackgroundService
+public sealed class ModerationOutboxWorker(IServiceScopeFactory scopes, RabbitMqOptions options,
+    BackgroundWorkWakeup<ModerationOutboxWorker> wakeup, TimeProvider clock,
+    ILogger<ModerationOutboxWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!options.Enabled) return;
         while (!stoppingToken.IsCancellationRequested)
         {
+            var delay = TimeSpan.FromSeconds(30);
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
-                if (await scope.ServiceProvider.GetRequiredService<ModerationOutboxPublisher>().PublishNextAsync(stoppingToken)) continue;
+                var publisher = scope.ServiceProvider.GetRequiredService<ModerationOutboxPublisher>();
+                if (await publisher.PublishNextAsync(stoppingToken)) continue;
+                delay = BackgroundWorkWakeup<ModerationOutboxWorker>.DelayUntil(
+                    await publisher.NextDueAsync(stoppingToken), clock.GetUtcNow());
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex) { logger.LogWarning(ex, "Moderation outbox worker will retry; decisions remain committed"); }
-            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            await wakeup.WaitAsync(delay, stoppingToken);
         }
     }
 }
@@ -147,7 +157,9 @@ public sealed class ModerationNotificationWorker(IServiceScopeFactory scopes, Ra
     }
 }
 
-public sealed class NotificationDeliveryWorker(IServiceScopeFactory scopes, RabbitMqOptions options, ILogger<NotificationDeliveryWorker> logger) : BackgroundService
+public sealed class NotificationDeliveryWorker(IServiceScopeFactory scopes, RabbitMqOptions options,
+    BackgroundWorkWakeup<NotificationDeliveryWorker> wakeup, TimeProvider clock,
+    ILogger<NotificationDeliveryWorker> logger) : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken) => options.Enabled
         ? Task.WhenAll(Enumerable.Range(0, 4).Select(_ => RunAsync(stoppingToken))) : Task.CompletedTask;
@@ -156,14 +168,18 @@ public sealed class NotificationDeliveryWorker(IServiceScopeFactory scopes, Rabb
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            var delay = TimeSpan.FromSeconds(30);
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
-                if (await scope.ServiceProvider.GetRequiredService<NotificationDeliveryProcessor>().DeliverNextAsync(stoppingToken)) continue;
+                var processor = scope.ServiceProvider.GetRequiredService<NotificationDeliveryProcessor>();
+                if (await processor.DeliverNextAsync(stoppingToken)) continue;
+                delay = BackgroundWorkWakeup<NotificationDeliveryWorker>.DelayUntil(
+                    await processor.NextDueAsync(stoppingToken), clock.GetUtcNow());
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex) { logger.LogWarning(ex, "Notification delivery worker will retry"); }
-            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            await wakeup.WaitAsync(delay, stoppingToken);
         }
     }
 }

@@ -8,6 +8,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      SePay__PaymentExpiryMinutes: "1440"
       Recommendation__Enabled: "true"
       Recommendation__ServiceUrl: http://recommendation:8000
       RabbitMq__Enabled: "true"

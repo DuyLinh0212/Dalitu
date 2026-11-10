@@ -20,6 +20,10 @@ public sealed class NotificationDeliveryProcessor(HuTubeDbContext db, IHubContex
     IAuthEmailSender emails, IPushNotificationSender push, AuthOptions auth, TimeProvider clock,
     ILogger<NotificationDeliveryProcessor> logger)
 {
+    public Task<DateTimeOffset?> NextDueAsync(CancellationToken ct) => db.NotificationDeliveries.AsNoTracking()
+        .Where(delivery => delivery.CompletedAt == null)
+        .Select(delivery => (DateTimeOffset?)delivery.AvailableAt).MinAsync(ct);
+
     public async Task<bool> DeliverNextAsync(CancellationToken ct = default)
     {
         var now = clock.GetUtcNow();

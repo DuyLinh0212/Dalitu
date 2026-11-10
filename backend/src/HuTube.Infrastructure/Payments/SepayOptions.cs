@@ -22,9 +22,9 @@ public sealed class SepayOptions
     public string BankCode { get; set; } = "";
 
     /// <summary>
-    /// Thời gian hết hạn của một đơn hàng chờ thanh toán (phút). Mặc định 30 phút.
+    /// Thời gian hết hạn của một đơn hàng chờ thanh toán (phút). Mặc định 24 giờ.
     /// </summary>
-    public int PaymentExpiryMinutes { get; set; } = 30;
+    public int PaymentExpiryMinutes { get; set; } = 1440;
 
     /// <summary>
     /// Prefix cho mã nội dung chuyển khoản. Mặc định "HUTUBE".

@@ -10,21 +10,36 @@ namespace HuTube.Infrastructure.Videos;
 
 public sealed class ChannelSuspensionExpirationWorker(
     IServiceScopeFactory scopes, TimeProvider clock,
-    ILogger<ChannelSuspensionExpirationWorker> logger) : BackgroundService
+    ILogger<ChannelSuspensionExpirationWorker> logger,
+    BackgroundWorkWakeup<ChannelSuspensionExpirationWorker>? wakeup = null) : BackgroundService
 {
+    private readonly BackgroundWorkWakeup<ChannelSuspensionExpirationWorker> scheduler = wakeup ?? new();
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1), clock);
-            do
+            while (!stoppingToken.IsCancellationRequested)
             {
-                try { await RestoreExpiredChannelsAsync(stoppingToken); }
+                var delay = TimeSpan.FromSeconds(30);
+                try
+                {
+                    await RestoreExpiredChannelsAsync(stoppingToken);
+                    await using var scope = scopes.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<HuTubeDbContext>();
+                    var next = await db.Channels.AsNoTracking()
+                        .Where(channel => channel.Status == "suspended" && channel.SuspendedUntil.HasValue)
+                        .Select(channel => channel.SuspendedUntil).MinAsync(stoppingToken);
+                    var now = clock.GetUtcNow();
+                    delay = next <= now ? TimeSpan.FromMinutes(1)
+                        : BackgroundWorkWakeup<ChannelSuspensionExpirationWorker>.DelayUntil(next, now);
+                }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogError(ex, "Không thể mở lại kênh đã hết hạn tạm ngưng.");
                 }
-            } while (await timer.WaitForNextTickAsync(stoppingToken));
+                await scheduler.WaitAsync(delay, stoppingToken);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }

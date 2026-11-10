@@ -9,6 +9,7 @@ using HuTube.Application.Storage;
 using HuTube.Application.Videos;
 using HuTube.Domain.Videos;
 using HuTube.Infrastructure.Persistence;
+using HuTube.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace HuTube.Infrastructure.Videos;
@@ -18,7 +19,8 @@ public sealed class ModerationService(
     RbacService rbac,
     IObjectStorage storage,
     StrikePolicySettingsService strikePolicySettings,
-    ILogger<ModerationService>? logger = null)
+    ILogger<ModerationService>? logger = null,
+    BackgroundWorkWakeup<ModerationOutboxWorker>? outboxWakeup = null)
 {
     public ModerationService(HuTubeDbContext db, RbacService rbac, IObjectStorage storage)
         : this(db, rbac, storage, new StrikePolicySettingsService(db, rbac)) { }
@@ -398,6 +400,7 @@ public sealed class ModerationService(
         ), ct);
 
         if (transaction != null) await transaction.CommitAsync(ct);
+        outboxWakeup?.Signal();
         logger?.LogInformation("Moderation decision and outbox {EventId} committed in {ElapsedMs} ms", notificationEvent.EventId, elapsed.ElapsedMilliseconds);
         return new ModerationDecisionResponse(
             moderationCase.ModerationCaseId,

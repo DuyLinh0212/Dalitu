@@ -14,7 +14,8 @@ public sealed class PaymentService(
     HuTubeDbContext db,
     IPlanService planService,
     SepayOptions options,
-    TimeProvider clock) : IPaymentService
+    TimeProvider clock,
+    PaymentExpiryWakeup? expiryWakeup = null) : IPaymentService
 {
     private DateTimeOffset Now => clock.GetUtcNow();
 
@@ -105,6 +106,7 @@ public sealed class PaymentService(
         db.Payments.Add(payment);
         await db.SaveChangesAsync(ct);
         if (transaction != null) await transaction.CommitAsync(ct);
+        expiryWakeup?.Signal();
 
         return (payment, plan.Name);
     }
